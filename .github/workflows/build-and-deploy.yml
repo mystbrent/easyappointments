@@ -1,0 +1,82 @@
+name: Build and Deploy to GCP
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write   # Workload Identity Federation
+  packages: write
+
+env:
+  REGION: us-central1
+  AR_REPO: ea-production
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for AR
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - id: meta
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/${{ env.AR_REPO }}:$SHA"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          docker build -f Dockerfile.production -t "$IMAGE" -t ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/${{ env.AR_REPO }}:latest .
+          docker push "$IMAGE"
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/${{ env.AR_REPO }}:latest --all-tags
+
+  terraform:
+    needs: build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SA }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
+
+      - run: terraform init
+
+      - name: Plan (PRs)
+        if: github.event_name == 'pull_request'
+        run: terraform plan -no-color -var="image=${{ needs.build.outputs.image }}"
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT }}
+          TF_VAR_domain: ${{ secrets.DOMAIN }}
+          TF_VAR_smtp_pass: ${{ secrets.SMTP_PASS }}
+
+      - name: Apply (main / tags)
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        run: terraform apply -auto-approve -var="image=${{ needs.build.outputs.image }}"
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT }}
+          TF_VAR_domain: ${{ secrets.DOMAIN }}
+          TF_VAR_smtp_pass: ${{ secrets.SMTP_PASS }}
