@@ -1,0 +1,15 @@
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+domain     = "bookings.example.com"
+
+# SMTP (shared across all instances)
+smtp_pass = "re_YOUR_RESEND_KEY"
+
+products = {
+  product-a = {
+    cors_origins    = "https://app.product-a.com"
+    frame_ancestors = "https://app.product-a.com"
+    min_instances   = 1
+  }
+  # product-b = { ... }
+}
