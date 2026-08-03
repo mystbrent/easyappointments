@@ -261,11 +261,33 @@ settings → service_categories → services → providers → webhooks
   - duplicate `key` values within `services` or `providers`
   - a `*_env` reference whose environment variable is unset
 
+## Local multi-vendor harness
+
+Validating the seeder requires several vendors with genuinely divergent configuration, and that costs nothing to run locally. `docker-compose.local.yml` is extended from one EA container to N, sharing a single MySQL — **structurally identical to production**, where one Cloud SQL server likewise hosts a separate database and user per vendor.
+
+```
+mysql:8.0  (:3307)  ──┬── ea_zeekr_gold_coast   ← ea-zeekr-gold-coast  (:8080)
+                      ├── ea_padlockd           ← ea-padlockd          (:8081)
+                      └── ea_gc_tours           ← ea-gc-tours          (:8082)
+```
+
+Implementation notes:
+
+- Per-vendor databases and users are created by a script in `docker-entrypoint-initdb.d`, mirroring what `scripts/provision-instance.sh` does against Cloud SQL.
+- All EA services declare the same `image:` tag with the same build context, so the production image is built once and reused rather than built per service.
+- Each service differs only in `EA_BASE_URL`, `EA_DB_NAME`, `EA_DB_USERNAME`, `EA_DB_PASSWORD`, and published port.
+- `scripts/start-local.sh` becomes the entry point: bring up the stack, wait for readiness, then run `ea-seed apply` for each manifest in `verticals/*.local.yml`.
+
+Because the seeder reaches EA over HTTP for everything after bootstrap, the same manifests target this harness or a deployed instance with only `base_url` changing.
+
+**What this harness cannot tell you:** cold-start latency under `min_instances: 0`, load-balancer and TLS behavior, and Cloud SQL socket connectivity. Those are deployment concerns, not seeding concerns, and are deferred to the first GCP bring-up.
+
 ## Testing
 
 - **Unit** — manifest validation: each rejection case above.
-- **Integration** — against `docker-compose.local.yml`: apply, snapshot all assigned IDs, apply again, assert byte-identical output and zero writes. This is the test that matters; idempotency is the entire value proposition.
-- **Retrofit as validation** — rewrite `scripts/start-local.sh` as a thin wrapper around `ea-seed apply verticals/padlockd-local.yml`. Reproducing the existing Padlockd setup (4 escape-room services, provider 2, evening hours, webhook, `require_phone_number: false`) validates the seeder against a real vertical rather than a synthetic one.
+- **Integration** — against the local multi-vendor harness: apply, snapshot all assigned IDs, apply again, assert byte-identical output and zero writes. This is the test that matters; idempotency is the entire value proposition.
+- **Cross-vendor divergence** — assert that seeding Zeekr (`require_phone_number: true`, daytime hours, party size 1) and Padlockd (`require_phone_number: false`, `19:00–23:59`, party sizes 6–8) against the same harness produces two instances whose settings do not affect each other. This is the property a shared instance could not provide, and it should be asserted rather than assumed.
+- **Retrofit as validation** — rewrite `scripts/start-local.sh` as a thin wrapper around `ea-seed apply`. Reproducing the existing Padlockd setup (4 escape-room services, provider 2, evening hours, webhook, `require_phone_number: false`) validates the seeder against a real vertical rather than a synthetic one.
 
 ## Workstream A: infra right-sizing
 
@@ -277,8 +299,25 @@ Separate, mergeable independently of the seeder.
 | `infra/terraform/modules/cloud-sql/variables.tf:11` | `tier` default `db-n1-standard-1 → db-custom-1-3840` | ~−$25/mo |
 | `infra/terraform/modules/cloud-sql/main.tf:11` | `availability_type` hardcoded `REGIONAL` → variable, default `ZONAL` | ~−$67/mo |
 | `infra/terraform/terraform.tfvars` | `min_instances: 0` per low-traffic product (knob exists at `variables.tf:42`) | ~−$10/mo each |
+| `infra/terraform/modules/network/main.tf:16` | **Verify then likely remove** the Serverless VPC connector | ~−$18/mo |
 
-Total ~$120/month before per-product savings.
+Total ~$120/month before per-product savings, or ~$137 if the connector is confirmed removable.
+
+### The VPC connector question
+
+`modules/ea-instance/main.tf:36` comments that the database host is *"resolved via Cloud Run socket"*, and the service mounts the Cloud SQL instance as a volume at `/cloudsql`. If that socket is the actual connection path, the Serverless VPC connector — which exists to give Cloud Run egress into private ranges — is not on the database path at all, yet bills ~$18/month for its minimum two instances.
+
+Before removing it, confirm nothing else depends on private-range egress (`vpc_access.egress` is currently `PRIVATE_RANGES_ONLY`). If confirmed, the connector, its `/28` subnet, and the private services access peering can all be dropped, and `EA_DB_HOST` set to the socket path explicitly rather than to the instance name with a clarifying comment.
+
+## Deferred: trimmed deployment tier
+
+Should a hosted environment be needed before the full stack is warranted, the same Terraform yields a ~$12–15/month configuration for three vendors by omitting modules rather than redesigning:
+
+- Skip the `load-balancer` and `dns` modules; use the `*.run.app` URL Cloud Run assigns each service. These affect only hostname aesthetics — CORS, webhook URLs, and `EA_BASE_URL` are indifferent to them.
+- `tier = "db-f1-micro"`, `disk_gb = 10`, `availability_type = "ZONAL"`.
+- `min_instances = 0` for every product.
+
+This is the same architecture with modules omitted, not a separate one, so nothing validated against it is invalidated on promotion to the full stack.
 
 Accepted trade-offs, recorded explicitly:
 
