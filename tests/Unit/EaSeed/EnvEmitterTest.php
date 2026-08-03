@@ -100,12 +100,66 @@ class EnvEmitterTest extends TestCase
 
     public function testNeverEmitsSecrets()
     {
-        $out = EnvEmitter::render(
-            $this->manifest([['key' => 'A', 'name' => 'A', 'duration' => 60]]),
-            $this->ids(['A' => 1])
-        );
+        putenv('EM_WEBHOOK_SECRET=whsec');
 
+        $raw = [
+            'product' => 'lostlocks',
+            'base_url' => 'http://localhost:8081',
+            'admin' => [
+                'first_name' => 'A', 'email' => 'a@example.com',
+                'username' => 'a', 'password_env' => 'EM_ADMIN_PASSWORD',
+            ],
+            'api_token_env' => 'EM_API_KEY',
+            'settings' => ['default_timezone' => 'Australia/Brisbane'],
+            'services' => [['key' => 'A', 'name' => 'A', 'duration' => 60]],
+            'providers' => [[
+                'key' => 'PRIMARY', 'first_name' => 'GM', 'email' => 'gm@lostlocks.test',
+                'phone' => '+61 7 5555 0200', 'services' => ['A'],
+                'settings' => ['username' => 'gm', 'password_env' => 'EM_PROVIDER_PASSWORD'],
+            ]],
+            'webhooks' => [[
+                'name' => 'PWA reconcile', 'url' => 'https://lostlocks.test/hook',
+                'actions' => ['appointment_save'], 'secret_token_env' => 'EM_WEBHOOK_SECRET',
+            ]],
+        ];
+
+        $out = EnvEmitter::render(Manifest::fromArray($raw), $this->ids(['A' => 1]));
+
+        // The API key (input to the seeder, resolved from the environment).
         $this->assertStringNotContainsString('tok', $out);
         $this->assertStringNotContainsString('EA_API_KEY=', $out);
+        // The admin and provider passwords.
+        $this->assertStringNotContainsString('pw', $out);
+        $this->assertStringNotContainsString('ppw', $out);
+        // The webhook secret, and its would-be env line.
+        $this->assertStringNotContainsString('whsec', $out);
+        $this->assertStringNotContainsString('EA_WEBHOOK_SECRET=', $out);
+    }
+
+    public function testThrowsWhenAProviderHasNoResolvedId()
+    {
+        $manifest = $this->manifest([['key' => 'A', 'name' => 'A', 'duration' => 60]]);
+        $ids = new Ids();
+        $ids->services = ['A' => 1];
+        // Providers deliberately left unresolved — as would happen running
+        // `env` before the instance has ever been seeded.
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/PRIMARY/');
+
+        EnvEmitter::render($manifest, $ids);
+    }
+
+    public function testThrowsWhenAServiceHasNoResolvedId()
+    {
+        $manifest = $this->manifest([['key' => 'A', 'name' => 'A', 'duration' => 60]]);
+        $ids = new Ids();
+        $ids->providers = ['PRIMARY' => 2];
+        // Services deliberately left unresolved.
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/\bA\b/');
+
+        EnvEmitter::render($manifest, $ids);
     }
 }

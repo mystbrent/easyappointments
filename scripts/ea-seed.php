@@ -45,7 +45,11 @@ try {
     exit(1);
 }
 
-$dryRun = $command === 'plan';
+// `env` is documented as read-only (it re-emits the .env file from ids that
+// already exist live) — only `apply` may write anything through the API.
+$dryRun = $command !== 'apply';
+
+$accumulatedChanges = [];
 
 try {
     if ($command === 'apply') {
@@ -74,7 +78,7 @@ try {
     $endpoint = getenv('EA_SEED_ENDPOINT') ?: $manifest->baseUrl;
 
     $client = new EaClient($endpoint, $manifest->apiToken);
-    $result = (new Converger($client))->run($manifest, $dryRun);
+    $result = (new Converger($client))->run($manifest, $dryRun, $accumulatedChanges);
 
     $counts = ['create' => 0, 'update' => 0, 'noop' => 0];
 
@@ -97,11 +101,24 @@ try {
     }
 
     $envPath = $root . '/.env.' . $manifest->product;
-    file_put_contents($envPath, EnvEmitter::render($manifest, $result['ids']));
+    $written = file_put_contents($envPath, EnvEmitter::render($manifest, $result['ids']));
+
+    if ($written === false) {
+        throw new RuntimeException("Could not write $envPath (disk full or not writable?).");
+    }
+
     fwrite(STDOUT, "→ wrote $envPath\n");
 
     exit(0);
 } catch (Throwable $e) {
+    if ($accumulatedChanges !== []) {
+        fwrite(STDERR, "\nChanges made before the failure:\n");
+        foreach ($accumulatedChanges as $change) {
+            $id = $change->id === null ? '' : " → {$change->id}";
+            fwrite(STDERR, sprintf("  %-18s %-8s %s%s\n", $change->resource, $change->action, $change->label, $id));
+        }
+    }
+
     fwrite(STDERR, "\nFailed: {$e->getMessage()}\n");
     fwrite(STDERR, "Nothing further was written. Re-run to converge from where this stopped.\n");
     exit(1);

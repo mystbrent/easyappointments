@@ -20,8 +20,13 @@ final class Converger
     {
     }
 
-    /** @return array{changes: list<Change>, ids: Ids} */
-    public function run(Manifest $manifest, bool $dryRun): array
+    /**
+     * @param array<int,Change> &$changes Collector so the caller can report what
+     *        already converged even when a later resource throws — a partial
+     *        apply is not a silent one; the operator must see it.
+     * @return array{changes: list<Change>, ids: Ids}
+     */
+    public function run(Manifest $manifest, bool $dryRun, array &$changes = []): array
     {
         $ids = new Ids();
         $changes = [];

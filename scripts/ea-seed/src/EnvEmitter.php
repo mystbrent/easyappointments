@@ -21,7 +21,14 @@ final class EnvEmitter
 
         foreach ($manifest->providers as $provider) {
             if (!isset($ids->providers[$provider['key']])) {
-                continue;
+                // With `env` (read-only), this means the provider was never
+                // converged, so the storefront's env file would be missing
+                // EA_PROVIDER_ID(_KEY) — silently omitting it lets the operator
+                // ship an incomplete config. Fail loudly instead: run `apply` first.
+                throw new \RuntimeException(
+                    "Cannot emit env: provider '{$provider['key']}' has no id — "
+                    . 'the instance has not been seeded yet. Run `apply` first.'
+                );
             }
 
             $suffix = $provider['key'] === 'PRIMARY' ? '' : '_' . $provider['key'];
@@ -32,7 +39,10 @@ final class EnvEmitter
 
         foreach ($manifest->services as $service) {
             if (!isset($ids->services[$service['key']])) {
-                continue;
+                throw new \RuntimeException(
+                    "Cannot emit env: service '{$service['key']}' has no id — "
+                    . 'the instance has not been seeded yet. Run `apply` first.'
+                );
             }
 
             $id = $ids->services[$service['key']];
