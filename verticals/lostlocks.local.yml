@@ -1,0 +1,79 @@
+# Vendor B — Lostlocks (escape rooms).
+# Consumed by ~/PitchTalks/Verticals/escape-rooms/lostlocks
+#
+# Note the 00:00 session on every day: Mastermind Heist runs a midnight slot
+# (app/api/slots/[roomId]/route.ts:15). Sessions compile to a 00:00-23:59 plan
+# with the closed middle of the day carved out as a break.
+product: lostlocks
+base_url: http://localhost:8081
+
+admin:
+  first_name: Lostlocks
+  last_name: Admin
+  email: admin@lostlocks.local
+  username: lostlocksadmin
+  password_env: LOSTLOCKS_ADMIN_PASSWORD
+api_token_env: LOSTLOCKS_API_KEY
+
+settings:
+  company_name: Lostlocks
+  company_email: bookings@lostlocks.local
+  company_link: https://lostlocks.local
+  default_timezone: Australia/Brisbane
+  require_phone_number: false
+  require_first_name: true
+  require_last_name: true
+  display_notes: true
+
+service_categories:
+  - name: Rooms
+
+services:
+  - key: MASTERMIND_HEIST
+    name: Mastermind Heist
+    duration: 60
+    attendants_number: 8
+    category: Rooms
+    requires_approval: true
+  - key: ZODIAC_KILLER
+    name: Zodiac Killer
+    duration: 60
+    attendants_number: 6
+    category: Rooms
+  - key: PRISON_BREAK
+    name: Prison Break
+    duration: 60
+    attendants_number: 6
+    category: Rooms
+  - key: ZOMBIE_LAB
+    name: Zombie Lab
+    duration: 60
+    attendants_number: 8
+    category: Rooms
+    requires_approval: true
+
+providers:
+  - key: PRIMARY
+    first_name: Lostlocks
+    last_name: Game Masters
+    email: gm@lostlocks.local
+    timezone: Australia/Brisbane
+    services: [MASTERMIND_HEIST, ZODIAC_KILLER, PRISON_BREAK, ZOMBIE_LAB]
+    settings:
+      username: lostlocksgm
+      password_env: LOSTLOCKS_PROVIDER_PASSWORD
+      working_plan:
+        monday:    [{ start: "00:00", end: "01:00" }, { start: "19:30", end: "23:59" }]
+        tuesday:   [{ start: "00:00", end: "01:00" }, { start: "19:30", end: "23:59" }]
+        wednesday: [{ start: "00:00", end: "01:00" }, { start: "19:30", end: "23:59" }]
+        thursday:  [{ start: "00:00", end: "01:00" }, { start: "19:30", end: "23:59" }]
+        friday:    [{ start: "00:00", end: "01:00" }, { start: "19:30", end: "23:59" }]
+        saturday:  [{ start: "00:00", end: "01:00" }, { start: "19:30", end: "23:59" }]
+        sunday:    [{ start: "00:00", end: "01:00" }, { start: "19:30", end: "23:59" }]
+
+webhooks:
+  - name: PWA reconcile
+    url: http://localhost:3001/api/webhooks/easyappointments
+    actions: [appointment_save, appointment_delete]
+    secret_token_env: LOSTLOCKS_WEBHOOK_SECRET
+    is_ssl_verified: false
