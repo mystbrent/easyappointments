@@ -69,6 +69,11 @@ final class WebhooksResource
                 continue;
             }
 
+            // ea-seed does not manage notes — omit on update so an admin-entered note
+            // survives a url/actions change. Same reasoning as the provider password
+            // and secret_token: fields we cannot meaningfully compare are left alone.
+            unset($payload['notes']);
+
             if (!$dryRun) {
                 $client->put('/api/v1/webhooks/' . $id, $payload);
             }

@@ -60,6 +60,8 @@ class WebhooksResourceTest extends TestCase
 
         $this->assertIsString($post[2]['actions']);
         $this->assertSame('["appointment_save","appointment_delete"]', $post[2]['actions']);
+        // Verify notes are present on CREATE
+        $this->assertArrayHasKey('notes', $post[2]);
     }
 
     public function testCreatesAndRecordsTheId()
@@ -100,5 +102,21 @@ class WebhooksResourceTest extends TestCase
 
         $this->assertSame('update', $changes[0]->action);
         $this->assertContains('PUT', array_column($this->calls, 0));
+    }
+
+    public function testUpdateOmitsNotesSoAdminEnteredNotesSurvive()
+    {
+        $existing = [[
+            'id' => 3,
+            'name' => 'PWA reconcile',
+            'url' => 'https://old.test/hook',
+            'actions' => '["appointment_save","appointment_delete"]',
+        ]];
+
+        WebhooksResource::converge($this->client($existing), $this->manifest(), new Ids(), false);
+
+        $put = array_values(array_filter($this->calls, fn($c) => $c[0] === 'PUT'))[0];
+
+        $this->assertArrayNotHasKey('notes', $put[2]);
     }
 }
