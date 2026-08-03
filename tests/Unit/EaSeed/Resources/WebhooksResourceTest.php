@@ -64,6 +64,23 @@ class WebhooksResourceTest extends TestCase
         $this->assertArrayHasKey('notes', $post[2]);
     }
 
+    public function testSendsSecretTokenAndSslFlagInCamelCaseSoTheyAreActuallyPersisted()
+    {
+        // Webhooks_model::api_decode() only recognises camelCase 'secretToken' /
+        // 'isSslVerified' — sending snake_case here means api_decode() silently
+        // drops the value (array_key_exists() never matches) and secret_token is
+        // never actually written to the database.
+        WebhooksResource::converge($this->client([]), $this->manifest(), new Ids(), false);
+
+        $post = array_values(array_filter($this->calls, fn($c) => $c[0] === 'POST'))[0];
+
+        $this->assertArrayHasKey('secretToken', $post[2]);
+        $this->assertSame('whsec', $post[2]['secretToken']);
+        $this->assertArrayHasKey('isSslVerified', $post[2]);
+        $this->assertArrayNotHasKey('secret_token', $post[2]);
+        $this->assertArrayNotHasKey('is_ssl_verified', $post[2]);
+    }
+
     public function testCreatesAndRecordsTheId()
     {
         $ids = new Ids();
@@ -81,12 +98,50 @@ class WebhooksResourceTest extends TestCase
             'name' => 'PWA reconcile',
             'url' => 'https://lostlocks.test/api/webhooks/easyappointments',
             'actions' => '["appointment_save","appointment_delete"]',
+            'secret_token' => 'whsec',
+            'is_ssl_verified' => true,
         ]];
 
         $changes = WebhooksResource::converge($this->client($existing), $this->manifest(), new Ids(), false);
 
         $this->assertSame('noop', $changes[0]->action);
         $this->assertEmpty(array_filter($this->calls, fn($c) => $c[0] !== 'GET'));
+    }
+
+    public function testUpdatesWhenTheSecretTokenHasRotatedEvenIfUrlAndActionsMatch()
+    {
+        // Webhooks_model::api_encode() returns secret_token straight from the DB
+        // row, so a rotated secret is detectable and must not report noop —
+        // silently keeping the old secret would break signature verification.
+        $existing = [[
+            'id' => 3,
+            'name' => 'PWA reconcile',
+            'url' => 'https://lostlocks.test/api/webhooks/easyappointments',
+            'actions' => '["appointment_save","appointment_delete"]',
+            'secret_token' => 'old-secret',
+            'is_ssl_verified' => true,
+        ]];
+
+        $changes = WebhooksResource::converge($this->client($existing), $this->manifest(), new Ids(), false);
+
+        $this->assertSame('update', $changes[0]->action);
+        $this->assertContains('PUT', array_column($this->calls, 0));
+    }
+
+    public function testUpdatesWhenTheSslVerifiedFlagDiffers()
+    {
+        $existing = [[
+            'id' => 3,
+            'name' => 'PWA reconcile',
+            'url' => 'https://lostlocks.test/api/webhooks/easyappointments',
+            'actions' => '["appointment_save","appointment_delete"]',
+            'secret_token' => 'whsec',
+            'is_ssl_verified' => false,
+        ]];
+
+        $changes = WebhooksResource::converge($this->client($existing), $this->manifest(), new Ids(), false);
+
+        $this->assertSame('update', $changes[0]->action);
     }
 
     public function testUpdatesWhenTheUrlDiffers()
@@ -102,6 +157,23 @@ class WebhooksResourceTest extends TestCase
 
         $this->assertSame('update', $changes[0]->action);
         $this->assertContains('PUT', array_column($this->calls, 0));
+    }
+
+    public function testThrowsWhenACreatedWebhookHasNoUsableId()
+    {
+        $client = new EaClient('http://ea.test', 'tok', function ($method) {
+            if ($method === 'GET') {
+                return ['status' => 200, 'body' => '[]'];
+            }
+
+            // Simulates a create response that decoded but carried no id.
+            return ['status' => 200, 'body' => '{}'];
+        });
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/PWA reconcile/');
+
+        WebhooksResource::converge($client, $this->manifest(), new Ids(), false);
     }
 
     public function testUpdateOmitsNotesSoAdminEnteredNotesSurvive()

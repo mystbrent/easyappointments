@@ -151,6 +151,28 @@ class ServicesResourceTest extends TestCase
         $this->assertNotEmpty($puts);
     }
 
+    public function testThrowsWhenACreatedServiceHasNoUsableId()
+    {
+        $client = new EaClient('http://ea.test', 'tok',
+            function ($method, $url) {
+                if ($method === 'GET' && str_contains($url, 'service_categories')) {
+                    // Category already exists so only the service create is exercised.
+                    return ['status' => 200, 'body' => json_encode([['id' => 5, 'name' => 'Rooms']])];
+                }
+                if ($method === 'GET') {
+                    return ['status' => 200, 'body' => '[]'];
+                }
+
+                // Simulates a create response that decoded but carried no id.
+                return ['status' => 200, 'body' => '{}'];
+            });
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/Mastermind Heist/');
+
+        ServicesResource::converge($client, $this->manifest(), new Ids(), false);
+    }
+
     public function testDryRunAssignsNoIdsAndIssuesNoWrites()
     {
         $ids = new Ids();

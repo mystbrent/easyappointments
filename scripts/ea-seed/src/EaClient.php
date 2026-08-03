@@ -26,6 +26,18 @@ final class EaClient
         return $this->send('GET', $path, null);
     }
 
+    /**
+     * Fetch a full collection. EA paginates at Api::$default_length (20), so an
+     * unpaginated GET silently truncates and records read as absent — which makes
+     * a converger create duplicates on every run.
+     */
+    public function getAll(string $path, int $length = 1000): array
+    {
+        $separator = str_contains($path, '?') ? '&' : '?';
+
+        return $this->get($path . $separator . 'length=' . $length);
+    }
+
     public function post(string $path, array $body): array
     {
         return $this->send('POST', $path, $body);
@@ -62,7 +74,16 @@ final class EaClient
 
         $decoded = json_decode($response['body'], true);
 
-        return is_array($decoded) ? $decoded : [];
+        if (!is_array($decoded)) {
+            $excerpt = substr($response['body'], 0, 200);
+            throw new EaHttpException(
+                $response['status'],
+                "EA {$response['status']} on {$method} {$path} returned a body that did not "
+                . "decode to a JSON array/object: \"$excerpt\""
+            );
+        }
+
+        return $decoded;
     }
 
     private function curlTransport(string $method, string $url, ?string $body, array $headers): array

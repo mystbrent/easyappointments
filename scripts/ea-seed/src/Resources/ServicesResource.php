@@ -21,7 +21,7 @@ final class ServicesResource
     {
         $changes = [];
 
-        $existingCategories = self::indexByName($client->get('/api/v1/service_categories'));
+        $existingCategories = self::indexByName($client->getAll('/api/v1/service_categories'));
 
         foreach ($manifest->serviceCategories as $category) {
             $name = $category['name'];
@@ -38,11 +38,11 @@ final class ServicesResource
             }
 
             $created = $client->post('/api/v1/service_categories', ['name' => $name]);
-            $ids->categories[$name] = (int) $created['id'];
+            $ids->categories[$name] = self::validatedId($created, 'service_category', $name);
             $changes[] = new Change('service_category', $name, 'create', $ids->categories[$name]);
         }
 
-        $existingServices = self::indexByName($client->get('/api/v1/services'));
+        $existingServices = self::indexByName($client->getAll('/api/v1/services'));
 
         foreach ($manifest->services as $service) {
             $payload = [
@@ -66,7 +66,7 @@ final class ServicesResource
                 }
 
                 $created = $client->post('/api/v1/services', $payload);
-                $ids->services[$service['key']] = (int) $created['id'];
+                $ids->services[$service['key']] = self::validatedId($created, 'service', $service['name']);
                 $changes[] = new Change('service', $service['name'], 'create', $ids->services[$service['key']]);
                 continue;
             }
@@ -87,6 +87,34 @@ final class ServicesResource
         }
 
         return $changes;
+    }
+
+    /**
+     * A create response with no positive integer id means the API returned a
+     * body that did not carry the record it claims to have created — storing
+     * (int) null (which casts to 0) is how EA_SERVICE_X=0 ended up in an
+     * emitted env file previously.
+     */
+    private static function validatedId(array $created, string $resource, string $label): int
+    {
+        $id = $created['id'] ?? null;
+
+        if (!is_int($id) && !(is_string($id) && ctype_digit($id))) {
+            throw new \RuntimeException(
+                "Created $resource '$label' but the API response had no usable id "
+                . '(got ' . var_export($id, true) . '). Refusing to store 0.'
+            );
+        }
+
+        $id = (int) $id;
+
+        if ($id <= 0) {
+            throw new \RuntimeException(
+                "Created $resource '$label' but the API returned a non-positive id ($id)."
+            );
+        }
+
+        return $id;
     }
 
     /** @return array<string,array> */

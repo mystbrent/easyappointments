@@ -24,7 +24,7 @@ final class WebhooksResource
         }
 
         $existing = [];
-        foreach ($client->get('/api/v1/webhooks') as $row) {
+        foreach ($client->getAll('/api/v1/webhooks') as $row) {
             if (isset($row['name'])) {
                 $existing[$row['name']] = $row;
             }
@@ -35,12 +35,18 @@ final class WebhooksResource
         foreach ($manifest->webhooks as $webhook) {
             $actions = json_encode(array_values($webhook['actions']), JSON_UNESCAPED_SLASHES);
 
+            // Webhooks_model::api_decode() only recognises camelCase 'secretToken'
+            // and 'isSslVerified' (single-word fields stay lowercase) — sending the
+            // snake_case names here means api_decode()'s array_key_exists() check
+            // never matches and the value is silently dropped, so secret_token is
+            // never actually persisted. This mirrors the camelCase convention
+            // ProvidersResource/ServicesResource already use for multi-word fields.
             $payload = [
                 'name' => $webhook['name'],
                 'url' => $webhook['url'],
                 'actions' => $actions,
-                'secret_token' => $webhook['secret_token'],
-                'is_ssl_verified' => $webhook['is_ssl_verified'],
+                'secretToken' => $webhook['secret_token'],
+                'isSslVerified' => $webhook['is_ssl_verified'],
                 'notes' => '',
             ];
 
@@ -53,7 +59,7 @@ final class WebhooksResource
                 }
 
                 $created = $client->post('/api/v1/webhooks', $payload);
-                $ids->webhooks[$webhook['name']] = (int) $created['id'];
+                $ids->webhooks[$webhook['name']] = self::validatedId($created, 'webhook', $webhook['name']);
                 $changes[] = new Change('webhook', $webhook['name'], 'create', $ids->webhooks[$webhook['name']]);
                 continue;
             }
@@ -61,8 +67,13 @@ final class WebhooksResource
             $id = (int) $match['id'];
             $ids->webhooks[$webhook['name']] = $id;
 
+            // Webhooks_model::api_encode() returns secret_token and is_ssl_verified
+            // straight from the row, so — unlike the provider password — drift on
+            // these fields IS detectable, and a rotated secret must not report noop.
             $unchanged = ($match['url'] ?? null) === $webhook['url']
-                && ($match['actions'] ?? null) === $actions;
+                && ($match['actions'] ?? null) === $actions
+                && ($match['secret_token'] ?? null) === $webhook['secret_token']
+                && (bool) ($match['is_ssl_verified'] ?? false) === $webhook['is_ssl_verified'];
 
             if ($unchanged) {
                 $changes[] = new Change('webhook', $webhook['name'], 'noop', $id);
@@ -82,5 +93,33 @@ final class WebhooksResource
         }
 
         return $changes;
+    }
+
+    /**
+     * A create response with no positive integer id means the API returned a
+     * body that did not carry the record it claims to have created — storing
+     * (int) null (which casts to 0) is how a bad id ended up written to an
+     * emitted env file previously.
+     */
+    private static function validatedId(array $created, string $resource, string $label): int
+    {
+        $id = $created['id'] ?? null;
+
+        if (!is_int($id) && !(is_string($id) && ctype_digit($id))) {
+            throw new \RuntimeException(
+                "Created $resource '$label' but the API response had no usable id "
+                . '(got ' . var_export($id, true) . '). Refusing to store 0.'
+            );
+        }
+
+        $id = (int) $id;
+
+        if ($id <= 0) {
+            throw new \RuntimeException(
+                "Created $resource '$label' but the API returned a non-positive id ($id)."
+            );
+        }
+
+        return $id;
     }
 }

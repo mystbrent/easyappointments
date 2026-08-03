@@ -220,8 +220,9 @@ class ProvidersResourceTest extends TestCase
 
         // Providers_model::get() already attaches settings (including workingPlan)
         // unconditionally; Providers_model::load() rejects `settings` as a `with`
-        // relation (it only supports `services`), so no query string is sent here.
-        $this->assertSame('http://ea.test/api/v1/providers', $this->calls[0][1]);
+        // relation (it only supports `services`), so no `with=` query string is
+        // sent here — only the pagination `length=` that getAll() always adds.
+        $this->assertSame('http://ea.test/api/v1/providers?length=1000', $this->calls[0][1]);
     }
 
     public function testDryRunIssuesNoWrites()
@@ -241,6 +242,26 @@ class ProvidersResourceTest extends TestCase
         $changes = ProvidersResource::converge($this->client([]), $this->manifest(), $ids, true);
 
         $this->assertSame('create', $changes[0]->action);
+    }
+
+    public function testThrowsWhenACreatedProviderHasNoUsableId()
+    {
+        $ids = new Ids();
+        $ids->services['MASTERMIND_HEIST'] = 7;
+
+        $client = new EaClient('http://ea.test', 'tok', function ($method) {
+            if ($method === 'GET') {
+                return ['status' => 200, 'body' => '[]'];
+            }
+
+            // Simulates a create response that decoded but carried no id.
+            return ['status' => 200, 'body' => '{}'];
+        });
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/Lostlocks Game Masters/');
+
+        ProvidersResource::converge($client, $this->manifest(), $ids, false);
     }
 
     public function testApplyStillThrowsOnUnresolvedServiceId()

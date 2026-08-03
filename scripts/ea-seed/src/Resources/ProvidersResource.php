@@ -28,7 +28,7 @@ final class ProvidersResource
         // provider — there is no ?with= parameter to request them, and asking for
         // `settings` is rejected by Providers_model::load().
         $existing = [];
-        foreach ($client->get('/api/v1/providers') as $row) {
+        foreach ($client->getAll('/api/v1/providers') as $row) {
             if (isset($row['email'])) {
                 $existing[$row['email']] = $row;
             }
@@ -84,7 +84,7 @@ final class ProvidersResource
                 }
 
                 $created = $client->post('/api/v1/providers', $payload);
-                $ids->providers[$provider['key']] = (int) $created['id'];
+                $ids->providers[$provider['key']] = self::validatedId($created, 'provider', $label);
                 $changes[] = new Change('provider', $label, 'create', $ids->providers[$provider['key']]);
                 continue;
             }
@@ -109,6 +109,34 @@ final class ProvidersResource
         }
 
         return $changes;
+    }
+
+    /**
+     * A create response with no positive integer id means the API returned a
+     * body that did not carry the record it claims to have created — storing
+     * (int) null (which casts to 0) is how a bad id ended up written to an
+     * emitted env file previously.
+     */
+    private static function validatedId(array $created, string $resource, string $label): int
+    {
+        $id = $created['id'] ?? null;
+
+        if (!is_int($id) && !(is_string($id) && ctype_digit($id))) {
+            throw new \RuntimeException(
+                "Created $resource '$label' but the API response had no usable id "
+                . '(got ' . var_export($id, true) . '). Refusing to store 0.'
+            );
+        }
+
+        $id = (int) $id;
+
+        if ($id <= 0) {
+            throw new \RuntimeException(
+                "Created $resource '$label' but the API returned a non-positive id ($id)."
+            );
+        }
+
+        return $id;
     }
 
     /** Compare everything the manifest owns, ignoring the write-only password. */
