@@ -66,7 +66,14 @@ try {
         }
     }
 
-    $client = new EaClient($manifest->baseUrl, $manifest->apiToken);
+    // Where ea-seed reaches EA. Defaults to the manifest's base_url, which is
+    // correct when the seeder runs outside the instance (e.g. a Cloud Run Job
+    // against a public URL). Override when running INSIDE the container, where
+    // the published host port does not exist in the container's own network
+    // namespace:  EA_SEED_ENDPOINT=http://localhost
+    $endpoint = getenv('EA_SEED_ENDPOINT') ?: $manifest->baseUrl;
+
+    $client = new EaClient($endpoint, $manifest->apiToken);
     $result = (new Converger($client))->run($manifest, $dryRun);
 
     $counts = ['create' => 0, 'update' => 0, 'noop' => 0];
