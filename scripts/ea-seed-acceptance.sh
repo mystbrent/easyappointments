@@ -28,6 +28,7 @@ seed() { # seed <service> <manifest> <command>
     $COMPOSE exec -T \
         -e ZEEKR_ADMIN_PASSWORD -e ZEEKR_PROVIDER_PASSWORD -e ZEEKR_API_KEY -e ZEEKR_WEBHOOK_SECRET \
         -e LOSTLOCKS_ADMIN_PASSWORD -e LOSTLOCKS_PROVIDER_PASSWORD -e LOSTLOCKS_API_KEY -e LOSTLOCKS_WEBHOOK_SECRET \
+        -e EA_SEED_ENDPOINT=http://localhost \
         "$1" php /var/www/html/scripts/ea-seed.php "$3" "/var/www/html/$2"
 }
 
