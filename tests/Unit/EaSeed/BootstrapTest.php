@@ -91,6 +91,26 @@ class BootstrapTest extends TestCase
         $this->assertSame(['tok_abc'], $rows);
     }
 
+    public function testDoesNotRewriteAdminCredentialsOnASecondRun()
+    {
+        // A vendor admin who changes their password in the EA UI must not have
+        // it silently reverted (and every session killed) by the next apply.
+        $this->bootstrap()->run($this->manifest());
+
+        $before = $this->pdo->query('SELECT password, salt FROM ea_user_settings')->fetch(PDO::FETCH_ASSOC);
+
+        // Simulate the admin changing their password through the EA UI.
+        $this->pdo->exec("UPDATE ea_user_settings SET password = 'ui-changed', salt = 'ui-salt'");
+
+        $this->bootstrap()->run($this->manifest());
+
+        $after = $this->pdo->query('SELECT password, salt FROM ea_user_settings')->fetch(PDO::FETCH_ASSOC);
+
+        $this->assertSame('ui-changed', $after['password']);
+        $this->assertSame('ui-salt', $after['salt']);
+        $this->assertNotSame($before['password'], $after['password']);
+    }
+
     public function testIsIdempotent()
     {
         $this->bootstrap()->run($this->manifest());

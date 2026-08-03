@@ -81,32 +81,27 @@ final class Bootstrap
         return (int) $this->pdo->lastInsertId();
     }
 
+    /**
+     * Write-on-insert, skip-on-update — the same convention ProvidersResource
+     * uses for the password field. A vendor admin who changes their password
+     * in the EA UI must not have it silently reverted (and their session
+     * killed) on the next apply.
+     */
     private function upsertAdminCredentials(int $userId, array $admin, array &$changes): void
     {
-        $salt = bin2hex(random_bytes(16));
-        $password = ($this->hasher)($salt, $admin['password']);
-
         $find = $this->pdo->prepare(
             "SELECT id_users FROM {$this->prefix}user_settings WHERE id_users = :id"
         );
         $find->execute([':id' => $userId]);
 
         if ($find->fetchColumn() !== false) {
-            $update = $this->pdo->prepare(
-                "UPDATE {$this->prefix}user_settings
-                 SET username = :username, password = :password, salt = :salt
-                 WHERE id_users = :id"
-            );
-            $update->execute([
-                ':username' => $admin['username'],
-                ':password' => $password,
-                ':salt' => $salt,
-                ':id' => $userId,
-            ]);
-            $changes[] = "admin credentials — refreshed";
+            $changes[] = 'admin credentials — unchanged';
 
             return;
         }
+
+        $salt = bin2hex(random_bytes(16));
+        $password = ($this->hasher)($salt, $admin['password']);
 
         $insert = $this->pdo->prepare(
             "INSERT INTO {$this->prefix}user_settings
