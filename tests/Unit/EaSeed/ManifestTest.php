@@ -140,6 +140,18 @@ class ManifestTest extends TestCase
         Manifest::fromArray($raw);
     }
 
+    public function testRejectsAMisspelledWeekdayKeyInWorkingPlan()
+    {
+        $raw = $this->valid();
+        $raw['providers'][0]['settings']['working_plan'] = [
+            'thurday' => [['start' => '09:00', 'end' => '17:00']],
+        ];
+
+        $this->expectException(ManifestException::class);
+        $this->expectExceptionMessageMatches('/thurday/');
+        Manifest::fromArray($raw);
+    }
+
     public function testRejectsProviderReferencingUnknownServiceKey()
     {
         $raw = $this->valid();

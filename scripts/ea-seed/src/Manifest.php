@@ -168,6 +168,16 @@ final class Manifest
     /** Validate and normalise every weekday's session list. */
     private static function workingPlan(array $plan, string $providerKey, string $source): array
     {
+        foreach (array_keys($plan) as $key) {
+            if (!in_array($key, self::DAYS, true)) {
+                throw new ManifestException(
+                    "Provider '$providerKey' has an unrecognised working_plan key '$key' — "
+                    . 'expected one of: ' . implode(', ', self::DAYS) . ". A misspelled weekday "
+                    . "(e.g. 'thurday') silently closes the provider for that day. ($source)"
+                );
+            }
+        }
+
         $out = [];
 
         foreach (self::DAYS as $day) {
