@@ -44,6 +44,61 @@ Two independent workstreams with no coupling between them.
 
 **B. `ea-seed`** — a per-vertical declarative manifest plus an idempotent seeder that takes a freshly-applied, empty EA instance to fully configured and emits the PWA's env vars.
 
+## Success criteria
+
+This work is complete when a single seeder, driven only by per-vendor manifests, provides working booking capability for **both** of the following storefronts — two unrelated organizations with incompatible requirements.
+
+### Vendor A — Zeekr Gold Coast
+
+`~/PitchTalks/pt-selfsell-zeekr-gold-coast-app` · EV dealership · Next.js on Cloudflare
+
+| Requirement | Value |
+|---|---|
+| Services | 4, **each a different duration**: Test Drive 60m, Showroom 30m, Finance 45m, Trade-in 30m |
+| Capacity | `attendantsNumber` 1 / 6 / 2 / 2 |
+| Hours | Daytime — Mon–Fri 09:00–17:00 (lunch break), Sat 09:00–16:00, Sun closed |
+| Phone number | **Required** |
+| Consumed by | `lib/booking/schedule.ts`, `app/api/ea/{services,slots,bookings}`, `app/api/webhooks/easyappointments` |
+| Env contract | `EA_BASE_URL`, `EA_API_KEY`, `EA_PROVIDER_ID`, `EA_SERVICE_{TEST_DRIVE,SHOWROOM,FINANCE,TRADEIN}`, `EA_WEBHOOK_SECRET`, `EA_TIMEZONE` |
+
+### Vendor B — Lostlocks
+
+`~/PitchTalks/Verticals/escape-rooms/lostlocks` · escape-room operator · Next.js + a separate Cloudflare Worker voice agent (`lostlocks-pwa`, `lostlocks-agent`)
+
+| Requirement | Value |
+|---|---|
+| Services | 4 rooms, **all fixed 60m** (`app/api/bookings/route.ts:53`) |
+| Capacity | Party size passed as `playerCount`, recorded in appointment notes |
+| Hours | Evening — sessions at 19:30 / 21:00 / 21:30 / 22:30, **and 00:00 for Mastermind Heist** (`app/api/slots/[roomId]/route.ts:15`) |
+| Phone number | **Optional** — the storefront submits an empty phone |
+| Approval gating | `EA_GATED_SERVICE_IDS` — comma-separated service IDs that cannot be booked directly and require owner approval (`worker/wrangler.toml:135`) |
+| Env contract | `EA_BASE_URL`, `EA_API_KEY`, `EA_PROVIDER_ID`, `EA_SERVICE_{MASTERMIND_HEIST,ZODIAC_KILLER,PRISON_BREAK,ZOMBIE_LAB}`, `EA_WEBHOOK_SECRET`, `EA_GATED_SERVICE_IDS` |
+
+### Criteria
+
+1. **Both vendors are seeded from manifests alone.** No admin-UI clicking, no hand-transcribed IDs, no per-vendor branch in the seeder. The only difference between them is the content of two YAML files.
+2. **Each emitted `.env` satisfies its storefront's full env contract**, with variable names matching what the code already reads — neither storefront requires a code change to adopt this.
+3. **The conflicting settings coexist.** Zeekr's `require_phone_number: true` and Lostlocks' `false` are both in effect simultaneously, on separate instances. Asserted by test, since this is the property a shared instance could not provide.
+4. **Lostlocks' 00:00 session is bookable.** The midnight slot resolves to real availability, not an empty slot list.
+5. **`EA_GATED_SERVICE_IDS` is emitted from the manifest**, resolving service keys to the numeric IDs assigned at seed time. Zeekr's manifest omits the concept entirely and its `.env` is unaffected.
+6. **Re-running the seeder against either live instance changes nothing** and re-emits byte-identical env files.
+
+### What criterion 4 forces
+
+Working plans are day-bounded with one `start`/`end` per weekday, so an evening block and a 00:00 session cannot both be expressed as a simple range. They can be expressed using **breaks**: a plan running `00:00`–`23:59` with a break covering the closed middle of the day yields availability at both ends.
+
+Requiring humans to write that inversion by hand is error-prone, so the manifest accepts the sessions a vendor actually operates and the seeder compiles them:
+
+```
+manifest                                   compiled working plan
+─────────────────────────────────────      ─────────────────────────────────
+sessions:                              →   start:  "00:00"
+  - { start: "00:00", end: "01:00" }       end:    "23:59"
+  - { start: "19:30", end: "23:59" }       breaks: [{ "01:00" → "19:30" }]
+```
+
+This replaces the earlier plan of rejecting any `end` earlier than its `start`. That validation was necessary but insufficient — Lostlocks has a legitimate midnight session, and a rule that only rejects would have blocked a real vendor.
+
 ## Architecture
 
 The seeder runs in two phases, forced by a bootstrap dependency: `api_token` is itself a setting, so the API cannot be authenticated against until it exists.
@@ -127,6 +182,7 @@ services:
     category: Sales                 # resolved → serviceCategoryId
     price: 0
     currency: AUD
+    requires_approval: false        # optional; true → id joins EA_GATED_SERVICE_IDS
   - key: SHOWROOM
     name: Showroom Visit
     duration: 30
@@ -154,14 +210,16 @@ providers:
     settings:
       username: zeekrsales
       password_env: EA_PROVIDER_PASSWORD
-      working_plan:                 # API: settings.workingPlan
-        monday:    { start: "09:00", end: "17:00", breaks: [{ start: "12:00", end: "13:00" }] }
-        tuesday:   { start: "09:00", end: "17:00", breaks: [] }
-        wednesday: { start: "09:00", end: "17:00", breaks: [] }
-        thursday:  { start: "09:00", end: "17:00", breaks: [] }
-        friday:    { start: "09:00", end: "17:00", breaks: [] }
-        saturday:  { start: "09:00", end: "16:00", breaks: [] }
-        sunday:    null             # closed
+      # Sessions the vendor actually operates. The seeder compiles these into
+      # EA's single start/end + breaks per day (see "What criterion 4 forces").
+      working_plan:
+        monday:    [{ start: "09:00", end: "12:00" }, { start: "13:00", end: "17:00" }]
+        tuesday:   [{ start: "09:00", end: "12:00" }, { start: "13:00", end: "17:00" }]
+        wednesday: [{ start: "09:00", end: "12:00" }, { start: "13:00", end: "17:00" }]
+        thursday:  [{ start: "09:00", end: "12:00" }, { start: "13:00", end: "17:00" }]
+        friday:    [{ start: "09:00", end: "12:00" }, { start: "13:00", end: "17:00" }]
+        saturday:  [{ start: "09:00", end: "16:00" }]
+        sunday:    []               # closed
 
 # ── POST /api/v1/webhooks ───────────────────────────────────────────────
 webhooks:
@@ -192,6 +250,12 @@ EA_SERVICE_SHOWROOM=8
 EA_SERVICE_FINANCE=9
 EA_SERVICE_TRADEIN=10
 EA_TIMEZONE=Australia/Brisbane
+```
+
+Vendors whose manifests declare `requires_approval` on any service additionally receive the resolved id list — Lostlocks emits `EA_GATED_SERVICE_IDS=1,4` where Zeekr emits the variable not at all:
+
+```
+EA_GATED_SERVICE_IDS=1,4
 ```
 
 Transferring these into the consuming PWA's environment (Cloudflare/Vercel project settings) stays manual and deliberate — the seeder does not hold credentials for the PWA platforms. `EA_API_KEY` and `EA_WEBHOOK_SECRET` are *inputs* resolved from Secret Manager, not outputs, and are never written to this file.
@@ -242,7 +306,7 @@ These are established behaviors of this codebase, each of which has already cost
 3. **Password hashing must use `password_helper.php`.** SHA-256 with salt, 100K iterations. This is why Phase 0 runs in-container.
 4. **`is_app_installed()` checks `$CI->db->table_exists('users')`.** Migrations create tables, so the installation wizard reports the app as already installed on a migrated-but-empty database. The seeder must detect "installed" by row presence, not table presence.
 5. **CSRF is enforced on installation endpoints** — they are not in `csrf_exclude_uris` (`config.php:410`, which covers `api/v1/.*` and the booking routes only). Phase 0 avoids the HTTP installation flow entirely for this reason.
-6. **`working_plan` is day-bounded.** `start`/`end` per weekday, maximum `23:59`, no cross-midnight spans. Padlockd's escape rooms already sit against this ceiling at `19:00–23:59`.
+6. **`working_plan` is day-bounded.** One `start`/`end` per weekday, maximum `23:59`, no cross-midnight spans. Both escape-room vendors sit against this ceiling — Padlockd at `19:00–23:59`, Lostlocks with a `00:00` session. The manifest's session list plus break compilation exists precisely to make that representable; see "What criterion 4 forces".
 
 ## Error handling
 
@@ -256,7 +320,9 @@ settings → service_categories → services → providers → webhooks
 - Any step fails → exit non-zero, print what was created, **do not write `.env`**. A partial env file is worse than none: the PWA boots with three of four service IDs and fails at runtime rather than at deploy time.
 - Re-running after a failure converges from wherever it stopped.
 - Manifest validation runs before any write. Rejected at parse time:
-  - `working_plan` with `end < start` on any day, with the day-bounded explanation
+  - a session with `end` earlier than or equal to `start` — no session may span midnight; a midnight session is expressed as a separate `00:00`-starting session, which is what makes Lostlocks' Mastermind Heist slot representable
+  - overlapping sessions within one day, which would compile to a contradictory break
+  - any session `end` later than `23:59`
   - a provider referencing a service `key` not declared in the manifest
   - duplicate `key` values within `services` or `providers`
   - a `*_env` reference whose environment variable is unset
@@ -267,9 +333,10 @@ Validating the seeder requires several vendors with genuinely divergent configur
 
 ```
 mysql:8.0  (:3307)  ──┬── ea_zeekr_gold_coast   ← ea-zeekr-gold-coast  (:8080)
-                      ├── ea_padlockd           ← ea-padlockd          (:8081)
-                      └── ea_gc_tours           ← ea-gc-tours          (:8082)
+                      └── ea_lostlocks          ← ea-lostlocks         (:8081)
 ```
+
+These are the two vendors named in the success criteria. A third instance can be added by copying a service block; nothing about the harness assumes a count.
 
 Implementation notes:
 
@@ -286,8 +353,11 @@ Because the seeder reaches EA over HTTP for everything after bootstrap, the same
 
 - **Unit** — manifest validation: each rejection case above.
 - **Integration** — against the local multi-vendor harness: apply, snapshot all assigned IDs, apply again, assert byte-identical output and zero writes. This is the test that matters; idempotency is the entire value proposition.
-- **Cross-vendor divergence** — assert that seeding Zeekr (`require_phone_number: true`, daytime hours, party size 1) and Padlockd (`require_phone_number: false`, `19:00–23:59`, party sizes 6–8) against the same harness produces two instances whose settings do not affect each other. This is the property a shared instance could not provide, and it should be asserted rather than assumed.
-- **Retrofit as validation** — rewrite `scripts/start-local.sh` as a thin wrapper around `ea-seed apply`. Reproducing the existing Padlockd setup (4 escape-room services, provider 2, evening hours, webhook, `require_phone_number: false`) validates the seeder against a real vertical rather than a synthetic one.
+- **Cross-vendor divergence** (success criterion 3) — seed Zeekr and Lostlocks against the same harness, then assert each instance reports its own `require_phone_number` and its own working plan. This is the property a shared instance could not provide, so it is asserted rather than assumed.
+- **Midnight availability** (success criterion 4) — after seeding Lostlocks, query availability for Mastermind Heist and assert `00:00` is returned. This exercises the compiled break inversion end to end rather than only unit-testing the compiler.
+- **Gated services** (success criterion 5) — assert Lostlocks' emitted env contains `EA_GATED_SERVICE_IDS` with the ids of exactly the services marked `requires_approval`, and that Zeekr's emitted env omits the variable.
+- **Env contract conformance** (success criterion 2) — assert each emitted file contains every variable its storefront reads: the seven Zeekr reads from `lib/booking/schedule.ts` and the ea-prefixed set Lostlocks reads across `app/api/slots/[roomId]/route.ts` and `worker/wrangler.toml`. This is the check that catches a manifest key renamed without its consumer.
+- **Retrofit as validation** — rewrite `scripts/start-local.sh` as a thin wrapper around `ea-seed apply`. It currently seeds escape-room data by hand-written SQL; reproducing that through a manifest validates the seeder against setup already known to work.
 
 ## Workstream A: infra right-sizing
 
