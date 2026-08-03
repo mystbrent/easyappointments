@@ -17,8 +17,11 @@ final class SettingsResource
             return [];
         }
 
+        // EA paginates at 20 by default (Api::$default_length). EA ships well over 20
+        // settings, so an unpaginated GET silently truncates and every manifest key
+        // reads as absent — causing a PUT on every apply and breaking idempotency.
         $current = [];
-        foreach ($client->get('/api/v1/settings') as $row) {
+        foreach ($client->get('/api/v1/settings?length=1000') as $row) {
             if (isset($row['name'])) {
                 $current[$row['name']] = (string) ($row['value'] ?? '');
             }

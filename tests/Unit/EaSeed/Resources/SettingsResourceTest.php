@@ -94,6 +94,18 @@ class SettingsResourceTest extends TestCase
         $this->assertCount(1, $this->calls, 'dry run must not issue a PUT');
     }
 
+    public function testRequestsAPageLargeEnoughToCoverEveryEaSetting()
+    {
+        // EA paginates at 20 by default; an unpaginated GET would silently
+        // truncate and make every manifest key look absent.
+        $client = $this->client([]);
+
+        SettingsResource::converge($client, $this->manifest(['company_name' => 'Lostlocks']), new Ids(), false);
+
+        $this->assertSame('GET', $this->calls[0][0]);
+        $this->assertStringContainsString('length=', $this->calls[0][1]);
+    }
+
     public function testBooleansAreSentAsOneAndZero()
     {
         $client = $this->client([]);

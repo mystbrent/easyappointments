@@ -65,10 +65,15 @@ echo
 echo "== Criterion 4: Lostlocks midnight slot is bookable =="
 HEIST_ID=$(grep '^EA_SERVICE_MASTERMIND_HEIST=' <<<"$LOST_ENV" | cut -d= -f2)
 PROVIDER_ID=$(grep '^EA_PROVIDER_ID=' <<<"$LOST_ENV" | cut -d= -f2)
-TOMORROW=$(date -v+1d +%Y-%m-%d 2>/dev/null || date -d '+1 day' +%Y-%m-%d)
+
+# Query 3 days out, not tomorrow. book_advance_timeout (default 30 min) is
+# evaluated in the provider's timezone, so a "tomorrow 00:00" check run shortly
+# before local midnight is legitimately excluded by the advance-notice window.
+# This is a property of the test's timing, not of the working plan.
+THREE_DAYS=$(date -v+3d +%Y-%m-%d 2>/dev/null || date -d '+3 days' +%Y-%m-%d)
 
 AVAIL=$(curl -s -H "Authorization: Bearer $LOSTLOCKS_API_KEY" \
-    "http://localhost:8081/api/v1/availabilities?serviceId=$HEIST_ID&providerId=$PROVIDER_ID&date=$TOMORROW")
+    "http://localhost:8081/api/v1/availabilities?serviceId=$HEIST_ID&providerId=$PROVIDER_ID&date=$THREE_DAYS")
 
 grep -q '"00:00"' <<<"$AVAIL" && pass "00:00 available for Mastermind Heist" \
     || fail "00:00 not in availabilities: $AVAIL"
