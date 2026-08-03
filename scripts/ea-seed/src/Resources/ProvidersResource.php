@@ -38,19 +38,32 @@ final class ProvidersResource
         foreach ($manifest->providers as $provider) {
             $label = trim($provider['first_name'] . ' ' . $provider['last_name']);
 
+            $serviceIds = [];
+
+            foreach ($provider['services'] as $key) {
+                if (isset($ids->services[$key])) {
+                    $serviceIds[] = $ids->services[$key];
+                    continue;
+                }
+
+                if (!$dryRun) {
+                    throw new \RuntimeException(
+                        "Provider '{$provider['key']}' references service key "
+                        . "'$key', which has no id — services must converge first."
+                    );
+                }
+
+                // Dry run against a not-yet-created service: no id exists yet.
+                // Nothing is sent, so an incomplete list is harmless and lets
+                // `plan` report the provider instead of crashing.
+            }
+
             $payload = [
                 'firstName' => $provider['first_name'],
                 'lastName' => $provider['last_name'],
                 'email' => $provider['email'],
                 'timezone' => $provider['timezone'],
-                'services' => array_values(array_map(
-                    fn(string $key) => $ids->services[$key]
-                        ?? throw new \RuntimeException(
-                            "Provider '{$provider['key']}' references service key '$key', "
-                            . 'which has no id — services must converge first.'
-                        ),
-                    $provider['services']
-                )),
+                'services' => $serviceIds,
                 'settings' => [
                     'username' => $provider['settings']['username'],
                     'password' => $provider['settings']['password'],

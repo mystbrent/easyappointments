@@ -218,4 +218,22 @@ class ProvidersResourceTest extends TestCase
 
         $this->assertEmpty(array_filter($this->calls, fn($c) => $c[0] !== 'GET'));
     }
+
+    public function testDryRunToleratesUnresolvedServiceIds()
+    {
+        $ids = new Ids();
+
+        $changes = ProvidersResource::converge($this->client([]), $this->manifest(), $ids, true);
+
+        $this->assertSame('create', $changes[0]->action);
+    }
+
+    public function testApplyStillThrowsOnUnresolvedServiceId()
+    {
+        $ids = new Ids();
+
+        $this->expectException(\RuntimeException::class);
+
+        ProvidersResource::converge($this->client([]), $this->manifest(), $ids, false);
+    }
 }
