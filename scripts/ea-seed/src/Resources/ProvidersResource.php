@@ -24,10 +24,11 @@ final class ProvidersResource
             return [];
         }
 
-        // ?with=settings is required — without it EA omits workingPlan, and the
-        // provider would be rewritten on every apply.
+        // get() already returns settings (including workingPlan) and services for every
+        // provider — there is no ?with= parameter to request them, and asking for
+        // `settings` is rejected by Providers_model::load().
         $existing = [];
-        foreach ($client->get('/api/v1/providers?with=settings') as $row) {
+        foreach ($client->get('/api/v1/providers') as $row) {
             if (isset($row['email'])) {
                 $existing[$row['email']] = $row;
             }

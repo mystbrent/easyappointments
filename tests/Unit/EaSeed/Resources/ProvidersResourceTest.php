@@ -131,7 +131,7 @@ class ProvidersResourceTest extends TestCase
         $this->assertNull($this->lastWriteBody()['settings']['workingPlan']['sunday']);
     }
 
-    /** A provider already matching the manifest, as EA returns it with ?with=settings. */
+    /** A provider already matching the manifest, as EA's plain GET /providers returns it. */
     private function converged(): array
     {
         return [[
@@ -211,14 +211,17 @@ class ProvidersResourceTest extends TestCase
         $this->assertArrayNotHasKey('password', $this->lastWriteBody()['settings']);
     }
 
-    public function testRequestsProvidersWithTheirSettings()
+    public function testRequestsThePlainProvidersListSinceItAlreadyIncludesSettings()
     {
         $ids = new Ids();
         $ids->services['MASTERMIND_HEIST'] = 7;
 
         ProvidersResource::converge($this->client([]), $this->manifest(), $ids, false);
 
-        $this->assertStringContainsString('with=settings', $this->calls[0][1]);
+        // Providers_model::get() already attaches settings (including workingPlan)
+        // unconditionally; Providers_model::load() rejects `settings` as a `with`
+        // relation (it only supports `services`), so no query string is sent here.
+        $this->assertSame('http://ea.test/api/v1/providers', $this->calls[0][1]);
     }
 
     public function testDryRunIssuesNoWrites()
