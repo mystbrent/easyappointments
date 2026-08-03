@@ -1,21 +1,23 @@
-# Local development stack for integration testing with product frontends (e.g. Padlockd PWA)
-# Usage: docker compose -f docker-compose.local.yml up --build
+# Local multi-vendor harness. Two EasyAppointments instances share one MySQL —
+# the same shape as production, where one Cloud SQL server hosts a separate
+# database and user per vendor.
 #
-# EA will be available at http://localhost:8080
-# First visit: http://localhost:8080/installation to create admin account
+#   ea-zeekr-gold-coast  http://localhost:8080
+#   ea-lostlocks         http://localhost:8081
+#   mysql                localhost:3307
+#
+# Usage: docker compose -f docker-compose.local.yml up --build -d
 
 services:
   mysql:
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: easyappointments
-      MYSQL_USER: ea_user
-      MYSQL_PASSWORD: ea_pass
     ports:
       - "3307:3306"
     volumes:
       - ea_mysql_data:/var/lib/mysql
+      - ./docker/local/init-vendors.sql:/docker-entrypoint-initdb.d/10-vendors.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass"]
       interval: 5s
@@ -23,7 +25,8 @@ services:
       retries: 10
       start_period: 30s
 
-  easyappointments:
+  ea-zeekr-gold-coast:
+    image: ea-local:latest
     build:
       context: .
       dockerfile: Dockerfile.production
@@ -33,15 +36,35 @@ services:
       EA_BASE_URL: "http://localhost:8080"
       EA_DB_HOST: mysql
       EA_DB_PORT: "3306"
-      EA_DB_NAME: easyappointments
-      EA_DB_USERNAME: ea_user
-      EA_DB_PASSWORD: ea_pass
+      EA_DB_NAME: ea_zeekr_gold_coast
+      EA_DB_USERNAME: ea_zeekr
+      EA_DB_PASSWORD: zeekr_pass
       EA_DB_SSL: "false"
       EA_DEBUG_MODE: "true"
-      EA_CORS_ORIGINS: "http://localhost:3000,http://localhost:3001"
+      EA_CORS_ORIGINS: "http://localhost:3000"
       EA_GOOGLE_SYNC: "false"
-      # EA_GOOGLE_CLIENT_ID: ""
-      # EA_GOOGLE_CLIENT_SECRET: ""
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  ea-lostlocks:
+    image: ea-local:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    ports:
+      - "8081:80"
+    environment:
+      EA_BASE_URL: "http://localhost:8081"
+      EA_DB_HOST: mysql
+      EA_DB_PORT: "3306"
+      EA_DB_NAME: ea_lostlocks
+      EA_DB_USERNAME: ea_lostlocks
+      EA_DB_PASSWORD: lostlocks_pass
+      EA_DB_SSL: "false"
+      EA_DEBUG_MODE: "true"
+      EA_CORS_ORIGINS: "http://localhost:3001"
+      EA_GOOGLE_SYNC: "false"
     depends_on:
       mysql:
         condition: service_healthy

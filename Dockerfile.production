@@ -55,6 +55,7 @@ COPY --from=builder /var/www/html/patch.php ./patch.php
 # Copy built assets and vendor
 COPY --from=builder /var/www/html/assets ./assets
 COPY --from=builder /var/www/html/vendor ./vendor
+COPY --from=builder /var/www/html/scripts ./scripts
 
 # Create storage directories with proper permissions
 RUN mkdir -p /var/www/html/storage/{logs,cache,sessions,uploads,backups} \
