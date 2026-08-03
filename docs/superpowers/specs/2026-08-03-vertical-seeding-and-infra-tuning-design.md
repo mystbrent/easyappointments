@@ -99,6 +99,12 @@ sessions:                              →   start:  "00:00"
 
 This replaces the earlier plan of rejecting any `end` earlier than its `start`. That validation was necessary but insufficient — Lostlocks has a legitimate midnight session, and a rule that only rejects would have blocked a real vendor.
 
+### A compiled plan is not the whole story
+
+Availability is time-of-query dependent, so a correct working plan does not guarantee a slot appears right now. `book_advance_timeout` (default 30 minutes, evaluated in the **provider's** timezone) withholds any slot inside its notice window. Querying "tomorrow at 00:00" shortly before local midnight therefore legitimately returns nothing, even though the plan is stored correctly.
+
+This cost a full acceptance round before being diagnosed. Any test asserting on a near-boundary slot should query several days out, and a vendor reporting "my midnight session isn't bookable" should have `book_advance_timeout` checked before the working plan is doubted.
+
 ## Architecture
 
 The seeder runs in two phases, forced by a bootstrap dependency: `api_token` is itself a setting, so the API cannot be authenticated against until it exists.
@@ -119,7 +125,20 @@ Phase 1 is pure HTTP, so the same seeder targets local Docker, Cloud Run, or the
 
 ### Runtime
 
-A PHP CLI script, `scripts/ea-seed.php`, executed inside the EA container — via `docker compose exec` locally and as a **Cloud Run Job on the same production image** in GCP.
+A PHP CLI script, `scripts/ea-seed.php`, executed inside the EA container — via `docker compose exec` locally and as a **Cloud Run Job on the same production image** in GCP. `Dockerfile.production` must therefore copy both `scripts/` and `verticals/` into the runtime stage; the job has nothing to seed from otherwise.
+
+### Two endpoints, not one
+
+A manifest's `base_url` is **what the storefront is told** — it becomes `EA_BASE_URL` in the emitted env file and must be the externally reachable URL. It is not necessarily reachable from wherever the seeder itself runs.
+
+When the CLI runs *inside* the instance it is configuring, the published host port does not exist in the container's own network namespace: `http://localhost:8080` is refused there, while `http://localhost` (port 80) serves. Set `EA_SEED_ENDPOINT` to override the address the seeder uses for its own API calls:
+
+```
+docker compose exec -e EA_SEED_ENDPOINT=http://localhost ea-zeekr-gold-coast \
+  php /var/www/html/scripts/ea-seed.php apply /var/www/html/verticals/zeekr-gold-coast.local.yml
+```
+
+`EA_BASE_URL` in the emitted file is unaffected — it always carries the manifest's `base_url`. Unset, the seeder addresses `base_url` directly, which is correct when it runs outside the instance (a Cloud Run Job against a public URL).
 
 This is forced by Phase 0: hashing the admin password requires `hash_password($salt, $password)` and `generate_salt()` from `application/helpers/password_helper.php:28,53` (SHA-256, salted, 100K iterations). Reimplementing that outside the container silently produces an unusable account. Running in-container also provides the DB connection, `ext-curl`, and `ext-json` with no new toolchain in a PHP repository.
 
@@ -182,7 +201,9 @@ services:
     category: Sales                 # resolved → serviceCategoryId
     price: 0
     currency: AUD
-    requires_approval: false        # optional; true → id joins EA_GATED_SERVICE_IDS
+    requires_approval: false        # optional; true → id joins EA_GATED_SERVICE_IDS.
+                                    # NOT sent to EA — it has no such field. This
+                                    # exists solely to populate the storefront's env.
   - key: SHOWROOM
     name: Showroom Visit
     duration: 30
@@ -205,6 +226,7 @@ providers:
     first_name: Zeekr
     last_name: Sales Team
     email: sales@zeekrgc.com.au     # natural key for idempotent matching
+    phone: "+61 7 5555 0100"        # required — Providers_model::validate() rejects an empty phone_number
     timezone: Australia/Brisbane
     services: [TEST_DRIVE, SHOWROOM, FINANCE, TRADEIN]
     settings:
@@ -295,7 +317,11 @@ Each resource converges against a natural key read back from the API.
 | providers | `email` | `POST` | `PUT` (incl. `workingPlan`, service links) |
 | webhooks | `name` | `POST` | `PUT` if url/actions differ |
 
-A manifest `key` matching nothing while its siblings do match emits a warning — this is the rename-created-a-duplicate case, and silence there is how duplicate services accumulate.
+A manifest `key` matching nothing while its siblings do match is the rename-created-a-duplicate case, and silence there is how duplicate services accumulate. **Not yet implemented** — no code path emits this warning today; it remains an open follow-up.
+
+Webhook `secret_token` is write-only: EA does not return it, so drift cannot be detected by comparison. A matched webhook is therefore always written rather than reported as unchanged, so that rotating a secret in the environment actually reaches the instance.
+
+Every collection read is paginated. EA's API defaults to 20 rows per page (`Api::$default_length`), so an unpaginated GET truncates and makes records beyond the first page read as *absent* — which would make a converger create duplicates on every run. All collection reads go through `EaClient::getAll()`.
 
 ## Known traps the seeder must encode
 
