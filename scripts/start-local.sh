@@ -58,19 +58,17 @@ wait_for_http() { # wait_for_http <name> <url>
 wait_for_http "zeekr-gold-coast" "http://localhost:8080/"
 wait_for_http "lostlocks" "http://localhost:8081/"
 
-# Dockerfile.production does not COPY verticals/ into the image, and scripts/
-# or vendor/ inside a running container can drift from the host between
-# rebuilds. Sync all three from the host before every seed so the container
-# always runs the current ea-seed CLI against the current manifests,
-# regardless of whether this run just rebuilt the image. `docker compose cp`
-# cannot overwrite an existing path in place under Colima's virtiofs, so the
-# destination is removed first.
+# Dockerfile.production now COPYs verticals/ into the image, so it no longer
+# needs syncing here for local iteration. scripts/ and vendor/ inside a running
+# container can still drift from the host between rebuilds (e.g. editing
+# ea-seed without rebuilding the image), so those two are synced from the host
+# before every seed. `docker compose cp` cannot overwrite an existing path in
+# place under Colima's virtiofs, so the destination is removed first.
 sync_container() { # sync_container <service>
-    echo "Syncing scripts, verticals, and vendor into $1..."
-    $COMPOSE exec -T "$1" rm -rf /var/www/html/scripts /var/www/html/verticals /var/www/html/vendor
-    $COMPOSE cp scripts    "$1":/var/www/html/scripts
-    $COMPOSE cp verticals  "$1":/var/www/html/verticals
-    $COMPOSE cp vendor     "$1":/var/www/html/vendor
+    echo "Syncing scripts and vendor into $1..."
+    $COMPOSE exec -T "$1" rm -rf /var/www/html/scripts /var/www/html/vendor
+    $COMPOSE cp scripts "$1":/var/www/html/scripts
+    $COMPOSE cp vendor  "$1":/var/www/html/vendor
 }
 
 sync_container ea-zeekr-gold-coast
