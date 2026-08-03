@@ -60,7 +60,8 @@
     },
     "autoload": {
         "psr-4": {
-            "Tests\\": "tests/"
+            "Tests\\": "tests/",
+            "EaSeed\\": "scripts/ea-seed/src/"
         }
     }
 }
