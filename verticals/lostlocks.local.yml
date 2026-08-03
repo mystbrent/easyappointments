@@ -57,6 +57,7 @@ providers:
     first_name: Lostlocks
     last_name: Game Masters
     email: gm@lostlocks.local
+    phone: "+61 7 5555 0200"
     timezone: Australia/Brisbane
     services: [MASTERMIND_HEIST, ZODIAC_KILLER, PRISON_BREAK, ZOMBIE_LAB]
     settings:

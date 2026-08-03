@@ -74,6 +74,21 @@ class ServicesResourceTest extends TestCase
         $this->assertSame('create', $changes[0]->action);
     }
 
+    public function testCreatePayloadIncludesAvailabilitiesType()
+    {
+        $ids = new Ids();
+
+        ServicesResource::converge($this->client([], []), $this->manifest(), $ids, false);
+
+        $creates = array_values(array_filter(
+            $this->calls,
+            fn($c) => $c[0] === 'POST' && str_contains($c[1], '/services')
+        ));
+        $payload = json_decode($creates[0][2], true);
+
+        $this->assertSame('flexible', $payload['availabilitiesType']);
+    }
+
     public function testReusesAnExistingCategoryByName()
     {
         $ids = new Ids();
@@ -94,6 +109,7 @@ class ServicesResourceTest extends TestCase
         $existing = [[
             'id' => 7, 'name' => 'Mastermind Heist', 'duration' => 60,
             'attendantsNumber' => 8, 'serviceCategoryId' => 5, 'price' => 0.0, 'currency' => '',
+            'availabilitiesType' => 'flexible',
         ]];
 
         $changes = ServicesResource::converge(
@@ -118,6 +134,7 @@ class ServicesResourceTest extends TestCase
         $existing = [[
             'id' => 7, 'name' => 'Mastermind Heist', 'duration' => 45,
             'attendantsNumber' => 8, 'serviceCategoryId' => 5, 'price' => 0.0, 'currency' => '',
+            'availabilitiesType' => 'flexible',
         ]];
 
         $changes = ServicesResource::converge(

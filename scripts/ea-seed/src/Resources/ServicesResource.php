@@ -51,6 +51,7 @@ final class ServicesResource
                 'attendantsNumber' => $service['attendants_number'],
                 'price' => $service['price'],
                 'currency' => $service['currency'],
+                'availabilitiesType' => 'flexible',
                 'serviceCategoryId' => $service['category'] === null
                     ? null
                     : ($ids->categories[$service['category']] ?? null),

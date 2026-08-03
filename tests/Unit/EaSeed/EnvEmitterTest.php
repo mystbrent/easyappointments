@@ -30,6 +30,7 @@ class EnvEmitterTest extends TestCase
             'services' => $services,
             'providers' => [[
                 'key' => 'PRIMARY', 'first_name' => 'GM', 'email' => 'gm@lostlocks.test',
+                'phone' => '+61 7 5555 0200',
                 'services' => array_column($services, 'key'),
                 'settings' => ['username' => 'gm', 'password_env' => 'EM_PROVIDER_PASSWORD'],
             ]],

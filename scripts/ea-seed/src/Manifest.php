@@ -128,6 +128,7 @@ final class Manifest
                 'first_name' => self::req($p, 'first_name', "$source providers"),
                 'last_name' => $p['last_name'] ?? '',
                 'email' => self::req($p, 'email', "$source providers"),
+                'phone' => self::req($p, 'phone', "$source providers"),
                 'timezone' => $p['timezone'] ?? 'UTC',
                 'services' => array_values($p['services'] ?? []),
                 'settings' => [

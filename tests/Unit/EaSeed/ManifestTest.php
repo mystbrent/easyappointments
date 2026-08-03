@@ -35,6 +35,7 @@ class ManifestTest extends TestCase
                 'first_name' => 'Zeekr',
                 'last_name' => 'Sales Team',
                 'email' => 'sales@zeekrgc.com.au',
+                'phone' => '+61 7 5555 0100',
                 'timezone' => 'Australia/Brisbane',
                 'services' => ['TEST_DRIVE'],
                 'settings' => [
@@ -233,6 +234,7 @@ class ManifestTest extends TestCase
             first_name: Zeekr
             last_name: Sales Team
             email: sales@zeekrgc.com.au
+            phone: '+61 7 5555 0100'
             timezone: Australia/Brisbane
             services:
               - TEST_DRIVE

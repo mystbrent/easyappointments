@@ -62,6 +62,7 @@ final class ProvidersResource
                 'firstName' => $provider['first_name'],
                 'lastName' => $provider['last_name'],
                 'email' => $provider['email'],
+                'phone' => $provider['phone'],
                 'timezone' => $provider['timezone'],
                 'services' => $serviceIds,
                 'settings' => [
@@ -112,7 +113,7 @@ final class ProvidersResource
     /** Compare everything the manifest owns, ignoring the write-only password. */
     private static function matches(array $existing, array $payload): bool
     {
-        foreach (['firstName', 'lastName', 'email', 'timezone'] as $field) {
+        foreach (['firstName', 'lastName', 'email', 'phone', 'timezone'] as $field) {
             if ((string) ($existing[$field] ?? '') !== (string) $payload[$field]) {
                 return false;
             }

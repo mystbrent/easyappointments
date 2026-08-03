@@ -38,6 +38,7 @@ class ProvidersResourceTest extends TestCase
                 'first_name' => 'Lostlocks',
                 'last_name' => 'Game Masters',
                 'email' => 'gm@lostlocks.test',
+                'phone' => '+61 7 5555 0200',
                 'timezone' => 'Australia/Brisbane',
                 'services' => ['MASTERMIND_HEIST'],
                 'settings' => [
@@ -96,6 +97,16 @@ class ProvidersResourceTest extends TestCase
         $this->assertSame([7], $this->lastWriteBody()['services']);
     }
 
+    public function testSendsThePhoneNumber()
+    {
+        $ids = new Ids();
+        $ids->services['MASTERMIND_HEIST'] = 7;
+
+        ProvidersResource::converge($this->client([]), $this->manifest(), $ids, false);
+
+        $this->assertSame('+61 7 5555 0200', $this->lastWriteBody()['phone']);
+    }
+
     public function testSendsTheCompiledWorkingPlanWithTheMidnightSessionIntact()
     {
         $ids = new Ids();
@@ -128,6 +139,7 @@ class ProvidersResourceTest extends TestCase
             'email' => 'gm@lostlocks.test',
             'firstName' => 'Lostlocks',
             'lastName' => 'Game Masters',
+            'phone' => '+61 7 5555 0200',
             'timezone' => 'Australia/Brisbane',
             'services' => [7],
             'settings' => [

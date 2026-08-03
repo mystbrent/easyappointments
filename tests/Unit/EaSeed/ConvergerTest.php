@@ -37,6 +37,7 @@ class ConvergerTest extends TestCase
             ],
             'providers' => [[
                 'key' => 'PRIMARY', 'first_name' => 'GM', 'email' => 'gm@lostlocks.test',
+                'phone' => '+61 7 5555 0200',
                 'services' => ['HEIST'],
                 'settings' => [
                     'username' => 'gm', 'password_env' => 'CV_PROVIDER_PASSWORD',
