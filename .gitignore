@@ -41,3 +41,7 @@
 *client_secret*.json
 
 Padlockd Demo PWA.json
+
+# Emitted by ea-seed — contains instance ids, regenerate with `ea-seed env`
+.env.*
+!.env.example
