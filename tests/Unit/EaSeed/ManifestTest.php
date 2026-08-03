@@ -168,4 +168,100 @@ class ManifestTest extends TestCase
         $this->expectExceptionMessageMatches('/TEST_API_KEY/');
         Manifest::fromArray($raw);
     }
+
+    public function testFromFileRejectsUnreadablePath()
+    {
+        $path = sys_get_temp_dir() . '/ea-seed-manifest-does-not-exist-' . uniqid() . '.yaml';
+
+        $this->expectException(ManifestException::class);
+        $this->expectExceptionMessageMatches('/not readable/');
+        Manifest::fromFile($path);
+    }
+
+    public function testFromFileRejectsInvalidYaml()
+    {
+        $path = tempnam(sys_get_temp_dir(), 'ea-seed-manifest-');
+        file_put_contents($path, "product: [unclosed");
+
+        try {
+            $this->expectException(ManifestException::class);
+            $this->expectExceptionMessageMatches('/not valid YAML/');
+            Manifest::fromFile($path);
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function testFromFileRejectsNonMappingDocument()
+    {
+        $path = tempnam(sys_get_temp_dir(), 'ea-seed-manifest-');
+        file_put_contents($path, "- a\n- b\n");
+
+        try {
+            $this->expectException(ManifestException::class);
+            $this->expectExceptionMessageMatches('/must be a YAML mapping/');
+            Manifest::fromFile($path);
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function testFromFileLoadsAWellFormedManifest()
+    {
+        $yaml = <<<YAML
+        product: zeekr-gold-coast
+        base_url: http://localhost:8080
+        admin:
+          first_name: Zeekr
+          last_name: Admin
+          email: admin@zeekrgc.com.au
+          username: zeekradmin
+          password_env: TEST_ADMIN_PASSWORD
+        api_token_env: TEST_API_KEY
+        settings:
+          require_phone_number: true
+        service_categories:
+          - name: Sales
+        services:
+          - key: TEST_DRIVE
+            name: Zeekr 7X Test Drive
+            duration: 60
+            attendants_number: 1
+            category: Sales
+        providers:
+          - key: PRIMARY
+            first_name: Zeekr
+            last_name: Sales Team
+            email: sales@zeekrgc.com.au
+            timezone: Australia/Brisbane
+            services:
+              - TEST_DRIVE
+            settings:
+              username: zeekrsales
+              password_env: TEST_PROVIDER_PASSWORD
+              working_plan:
+                monday:
+                  - start: '13:00'
+                    end: '17:00'
+                  - start: '09:00'
+                    end: '12:00'
+                sunday: []
+        webhooks:
+          - name: PWA reconcile
+            url: https://example.com/api/webhooks/easyappointments
+            actions:
+              - appointment_save
+            secret_token_env: TEST_WEBHOOK_SECRET
+        YAML;
+
+        $path = tempnam(sys_get_temp_dir(), 'ea-seed-manifest-');
+        file_put_contents($path, $yaml);
+
+        try {
+            $m = Manifest::fromFile($path);
+            $this->assertSame('zeekr-gold-coast', $m->product);
+        } finally {
+            unlink($path);
+        }
+    }
 }

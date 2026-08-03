@@ -2,6 +2,7 @@
 
 namespace EaSeed;
 
+use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -35,7 +36,22 @@ final class Manifest
             throw new ManifestException("Manifest not readable: $path");
         }
 
-        return self::fromArray(Yaml::parseFile($path) ?? [], $path);
+        try {
+            $raw = Yaml::parseFile($path);
+        } catch (ParseException $e) {
+            throw new ManifestException(
+                "Manifest $path is not valid YAML: {$e->getMessage()}"
+            );
+        }
+
+        if ($raw !== null && (!is_array($raw) || array_is_list($raw))) {
+            throw new ManifestException(
+                "Manifest $path must be a YAML mapping, got "
+                . (is_array($raw) ? 'a list' : gettype($raw))
+            );
+        }
+
+        return self::fromArray($raw ?? [], $path);
     }
 
     public static function fromArray(array $raw, string $source = 'manifest'): self
