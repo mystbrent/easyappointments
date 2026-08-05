@@ -1,0 +1,135 @@
+# Production multi-vendor stack.
+#
+# One MySQL server hosting a separate database + user per vendor, one EA
+# container per vendor, and Caddy terminating TLS in front. Same shape as
+# docker-compose.local.yml — only the hostnames and the TLS layer differ.
+#
+#   https://zeekr.bookings.knowwhats.best      → ea-zeekr-gold-coast
+#   https://lostlocks.bookings.knowwhats.best  → ea-lostlocks
+#
+# Secrets come from a .env file beside this one — see .env.production.example.
+# Never commit that file.
+#
+#   docker compose -f docker-compose.production.yml up -d
+#
+# Host-agnostic: this runs on a DigitalOcean droplet, the old Hetzner box, or
+# anything else with Docker and ports 80/443 reachable.
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      ZEEKR_DB_PASSWORD: ${ZEEKR_DB_PASSWORD:?set ZEEKR_DB_PASSWORD in .env}
+      LOSTLOCKS_DB_PASSWORD: ${LOSTLOCKS_DB_PASSWORD:?set LOSTLOCKS_DB_PASSWORD in .env}
+    volumes:
+      - ea_mysql_data:/var/lib/mysql
+      - ./docker/production/init-vendors.sh:/docker-entrypoint-initdb.d/10-vendors.sh:ro
+    ports:
+      # Loopback ONLY — never 0.0.0.0, which would expose MySQL to the internet.
+      # Bound so the existing scripts/backup-databases.sh can reach it over TCP
+      # with MYSQL_HOST=127.0.0.1, exactly as it does on the current VPS.
+      - "127.0.0.1:3306:3306"
+    command:
+      # EA's data is tiny; keep InnoDB from claiming a large default buffer pool
+      # so a 2 GB droplet has room for the PHP-FPM pools.
+      - --innodb-buffer-pool-size=256M
+      - --performance-schema=OFF
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+    networks:
+      ea_net:
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./docker/production/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data          # certificates — losing this re-issues, and
+      - caddy_config:/config      # Let's Encrypt rate-limits at 5/domain/week
+    depends_on:
+      - ea-zeekr-gold-coast
+      - ea-lostlocks
+    networks:
+      ea_net:
+
+  ea-zeekr-gold-coast:
+    image: ea-production:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    environment:
+      EA_BASE_URL: "https://zeekr.bookings.knowwhats.best"
+      EA_DB_HOST: mysql
+      EA_DB_PORT: "3306"
+      EA_DB_NAME: ea_zeekr_gold_coast
+      EA_DB_USERNAME: ea_zeekr
+      EA_DB_PASSWORD: ${ZEEKR_DB_PASSWORD:?}
+      EA_DB_SSL: "false"
+      EA_DEBUG_MODE: "false"
+      # The storefront's origin. Without this the browser blocks every booking
+      # call with a CORS error, and the failure looks like the API is down.
+      EA_CORS_ORIGINS: ${ZEEKR_CORS_ORIGINS:?set ZEEKR_CORS_ORIGINS in .env}
+      # Trust X-Forwarded-* from Caddy on the compose network, so EA sees the
+      # real client IP and correctly detects HTTPS (config.php:21).
+      EA_PROXY_IPS: "172.28.0.0/16"
+      EA_GOOGLE_SYNC: "false"
+    volumes:
+      - zeekr_uploads:/var/www/html/storage/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      ea_net:
+
+  ea-lostlocks:
+    image: ea-production:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    environment:
+      EA_BASE_URL: "https://lostlocks.bookings.knowwhats.best"
+      EA_DB_HOST: mysql
+      EA_DB_PORT: "3306"
+      EA_DB_NAME: ea_lostlocks
+      EA_DB_USERNAME: ea_lostlocks
+      EA_DB_PASSWORD: ${LOSTLOCKS_DB_PASSWORD:?}
+      EA_DB_SSL: "false"
+      EA_DEBUG_MODE: "false"
+      EA_CORS_ORIGINS: ${LOSTLOCKS_CORS_ORIGINS:?set LOSTLOCKS_CORS_ORIGINS in .env}
+      EA_PROXY_IPS: "172.28.0.0/16"
+      EA_GOOGLE_SYNC: "false"
+    volumes:
+      - lostlocks_uploads:/var/www/html/storage/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      ea_net:
+
+networks:
+  ea_net:
+    driver: bridge
+    ipam:
+      config:
+        # Pinned so EA_PROXY_IPS above stays accurate. Change both together.
+        - subnet: 172.28.0.0/16
+
+volumes:
+  ea_mysql_data:
+  caddy_data:
+  caddy_config:
+  zeekr_uploads:
+  lostlocks_uploads:

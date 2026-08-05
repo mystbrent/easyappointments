@@ -1,0 +1,77 @@
+# Vendor A — Zeekr Gold Coast (EV dealership) — PRODUCTION.
+# Storefront: https://pt-selfsell-zeekr-gold-coast-app.indiebuildinganton.workers.dev
+# Seeded onto: https://zeekr.bookings.knowwhats.best
+product: zeekr-gold-coast
+base_url: https://zeekr.bookings.knowwhats.best
+
+admin:
+  first_name: Zeekr
+  last_name: Admin
+  email: admin@knowwhats.best
+  username: zeekradmin
+  password_env: ZEEKR_ADMIN_PASSWORD
+api_token_env: ZEEKR_API_KEY
+
+settings:
+  company_name: Zeekr Gold Coast
+  company_email: bookings@knowwhats.best
+  company_link: https://pt-selfsell-zeekr-gold-coast-app.indiebuildinganton.workers.dev
+  default_timezone: Australia/Brisbane
+  require_phone_number: true
+  require_first_name: true
+  require_last_name: true
+  display_notes: true
+
+service_categories:
+  - name: Sales
+
+services:
+  - key: TEST_DRIVE
+    name: Zeekr 7X Test Drive
+    duration: 60
+    attendants_number: 1
+    category: Sales
+    price: 0
+    currency: AUD
+  - key: SHOWROOM
+    name: Showroom Visit
+    duration: 30
+    attendants_number: 6
+    category: Sales
+  - key: FINANCE
+    name: Finance Consultation
+    duration: 45
+    attendants_number: 2
+    category: Sales
+  - key: TRADEIN
+    name: Trade-in Appraisal
+    duration: 30
+    attendants_number: 2
+    category: Sales
+
+providers:
+  - key: PRIMARY
+    first_name: Zeekr
+    last_name: Sales Team
+    email: sales@knowwhats.best
+    phone: "+61 7 5555 0100"
+    timezone: Australia/Brisbane
+    services: [TEST_DRIVE, SHOWROOM, FINANCE, TRADEIN]
+    settings:
+      username: zeekrsales
+      password_env: ZEEKR_PROVIDER_PASSWORD
+      working_plan:
+        monday:    [{ start: "09:00", end: "12:00" }, { start: "13:00", end: "17:00" }]
+        tuesday:   [{ start: "09:00", end: "12:00" }, { start: "13:00", end: "17:00" }]
+        wednesday: [{ start: "09:00", end: "12:00" }, { start: "13:00", end: "17:00" }]
+        thursday:  [{ start: "09:00", end: "12:00" }, { start: "13:00", end: "17:00" }]
+        friday:    [{ start: "09:00", end: "12:00" }, { start: "13:00", end: "17:00" }]
+        saturday:  [{ start: "09:00", end: "16:00" }]
+        sunday:    []
+
+webhooks:
+  - name: PWA reconcile
+    url: https://pt-selfsell-zeekr-gold-coast-app.indiebuildinganton.workers.dev/api/webhooks/easyappointments
+    actions: [appointment_save, appointment_delete]
+    secret_token_env: ZEEKR_WEBHOOK_SECRET
+    is_ssl_verified: true

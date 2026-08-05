@@ -1,0 +1,48 @@
+# TLS termination and per-vendor routing.
+#
+# Caddy issues a separate Let's Encrypt certificate for each hostname over the
+# HTTP-01 challenge. A wildcard DNS record (*.bookings) is enough — a wildcard
+# *certificate* would require DNS-01 and a Cloudflare API token, which we avoid.
+#
+# The Cloudflare DNS records MUST be "DNS only" (grey cloud). Proxied (orange)
+# intercepts the ACME challenge and certificate issuance fails, then surfaces
+# as a Cloudflare 525/526 rather than anything that names the real cause.
+
+{
+	email {$ACME_EMAIL}
+
+	# Uncomment while testing to avoid burning Let's Encrypt's production rate
+	# limit (5 certs per domain per week). Staging certs are untrusted by
+	# browsers — expect a warning, and expect Cloudflare Workers to reject them.
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# Shared behaviour for every vendor host.
+(vendor) {
+	encode gzip
+
+	# EA reads X-Forwarded-Proto to build absolute URLs (application/config/config.php:21).
+	# Caddy sets it automatically on reverse_proxy; stated here so the dependency
+	# is visible to anyone editing this file.
+	reverse_proxy {args[0]}:80 {
+		header_up X-Real-IP {remote_host}
+	}
+
+	log {
+		output file /data/access-{args[0]}.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}
+
+zeekr.bookings.knowwhats.best {
+	import vendor ea-zeekr-gold-coast
+}
+
+lostlocks.bookings.knowwhats.best {
+	import vendor ea-lostlocks
+}
+
+# Adding a vendor is three lines here, one service in the compose file, and one
+# manifest in verticals/. The wildcard DNS record already covers the hostname.

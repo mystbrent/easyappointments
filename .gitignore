@@ -45,3 +45,7 @@ Padlockd Demo PWA.json
 # Emitted by ea-seed — contains instance ids, regenerate with `ea-seed env`
 .env.*
 !.env.example
+# Production secrets for docker-compose.production.yml. The .env.* rule above
+# does NOT cover a bare `.env`.
+/.env
+!.env.production.example
