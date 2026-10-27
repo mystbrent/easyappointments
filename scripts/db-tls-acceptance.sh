@@ -176,5 +176,16 @@ grep -q '0 created, 0 updated' <<<"$OUT" && pass "0 created, 0 updated" \
     || fail "second apply reported changes: $(grep -E '[0-9]+ created' <<<"$OUT")"
 
 echo
+echo "== Case 8: image runs a passed command (App Platform one-shot jobs) =="
+# Bounded: without the entrypoint change the image starts supervisord and never exits.
+OUT=$(timeout 60 docker run --rm ea-tls:test php -r 'echo "job-ok\n";' 2>&1); RC=$?
+echo "    rc=$RC"; echo "    output: $(head -c 400 <<<"$OUT")"
+[ "$RC" -eq 0 ] && pass "passed command exits 0" || fail "passed command rc=$RC (124 = timed out)"
+grep -q 'job-ok' <<<"$OUT" && pass "passed command ran (job-ok)" || fail "output lacks job-ok"
+grep -q 'supervisord' <<<"$OUT" && fail "supervisord started for a passed command" || pass "supervisord not started"
+timeout 60 docker run --rm ea-tls:test sh -c 'exit 3' >/dev/null 2>&1; RC=$?
+[ "$RC" -eq 3 ] && pass "passed command's exit status propagates (3)" || fail "exit status rc=$RC (want 3)"
+
+echo
 [ "$FAIL" -eq 0 ] && echo "ALL CRITERIA PASSED" || echo "ACCEPTANCE FAILED"
 exit "$FAIL"
