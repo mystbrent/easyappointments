@@ -1,10 +1,8 @@
 name: Build and Deploy to GCP
 
+# Runs only when a PR is merged into main (a merge lands as a push to main).
 on:
   push:
-    branches: [main]
-    tags: ['v*']
-  pull_request:
     branches: [main]
 
 permissions:
@@ -65,16 +63,7 @@ jobs:
 
       - run: terraform init
 
-      - name: Plan (PRs)
-        if: github.event_name == 'pull_request'
-        run: terraform plan -no-color -var="image=${{ needs.build.outputs.image }}"
-        env:
-          TF_VAR_project_id: ${{ secrets.GCP_PROJECT }}
-          TF_VAR_domain: ${{ secrets.DOMAIN }}
-          TF_VAR_smtp_pass: ${{ secrets.SMTP_PASS }}
-
-      - name: Apply (main / tags)
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+      - name: Apply
         run: terraform apply -auto-approve -var="image=${{ needs.build.outputs.image }}"
         env:
           TF_VAR_project_id: ${{ secrets.GCP_PROJECT }}
