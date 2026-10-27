@@ -1,6 +1,7 @@
 name: CI
 
-on: [ push ]
+# Manual only, to save Actions minutes. Run from the Actions tab when needed.
+on: workflow_dispatch
 
 jobs:
   build-test:
