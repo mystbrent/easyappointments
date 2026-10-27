@@ -29,6 +29,7 @@ require_once $root . '/vendor/autoload.php';
 define('BASEPATH', true);
 require_once $root . '/application/config/constants.php';
 require_once $root . '/application/helpers/password_helper.php';
+require_once $root . '/application/helpers/db_ssl_helper.php';
 
 $command = $argv[1] ?? '';
 $path = $argv[2] ?? '';
@@ -53,6 +54,8 @@ $accumulatedChanges = [];
 
 try {
     if ($command === 'apply') {
+        $ssl = ea_db_ssl_config(getenv(), sys_get_temp_dir());
+
         $pdo = new PDO(
             sprintf(
                 'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
@@ -62,7 +65,7 @@ try {
             ),
             getenv('EA_DB_USERNAME') ?: '',
             getenv('EA_DB_PASSWORD') ?: '',
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION] + ($ssl === false ? [] : ea_db_pdo_ssl_options($ssl))
         );
 
         foreach ((new Bootstrap($pdo, 'hash_password'))->run($manifest) as $line) {

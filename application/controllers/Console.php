@@ -32,7 +32,21 @@ class Console extends EA_Controller
             exit('No direct script access allowed');
         }
 
-        parent::__construct();
+        try {
+            parent::__construct();
+        } catch (RuntimeException $e) {
+            // The framework's DB autoload throws when the connection fails (mysqli_sql_exception
+            // from real_connect, or CI's own "Unable to connect"). Uncaught, that is a silent
+            // exit(1) in production (db_debug off), which a PRE_DEPLOY job log cannot explain.
+            // Say so, cleanly, and fail.
+            if (!($e instanceof mysqli_sql_exception) && $e->getMessage() !== 'Unable to connect to the database.') {
+                throw $e;
+            }
+
+            fwrite(STDERR, 'Database connection failed' . PHP_EOL);
+
+            exit(1);
+        }
 
         $this->load->dbutil();
 

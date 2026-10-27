@@ -1,0 +1,39 @@
+# Minimal manifest for scripts/db-tls-acceptance.sh: one service, one provider.
+product: tls-acceptance
+base_url: http://localhost
+
+admin:
+  first_name: Tls
+  last_name: Admin
+  email: admin@tls-acceptance.local
+  username: tlsadmin
+  password_env: TLS_ADMIN_PASSWORD
+api_token_env: TLS_API_KEY
+
+settings:
+  company_name: TLS Acceptance
+  default_timezone: Australia/Brisbane
+
+service_categories:
+  - name: Rooms
+
+services:
+  - key: ROOM
+    name: Test Room
+    duration: 60
+    attendants_number: 1
+    category: Rooms
+
+providers:
+  - key: PRIMARY
+    first_name: Tls
+    last_name: Provider
+    email: provider@tls-acceptance.local
+    phone: "+61 7 5555 0300"
+    timezone: Australia/Brisbane
+    services: [ROOM]
+    settings:
+      username: tlsprovider
+      password_env: TLS_PROVIDER_PASSWORD
+      working_plan:
+        monday: [{ start: "09:00", end: "17:00" }]
