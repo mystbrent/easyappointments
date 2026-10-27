@@ -119,4 +119,28 @@ class DbSslHelperTest extends TestCase {
 
         $this->assertSame([$ca => '/tmp/ca.pem', $verify => false], $options);
     }
+
+    public function test_connect_failure_detail_names_code_and_cause(): void
+    {
+        $e = new \mysqli_sql_exception("Access denied for user 'ea'@'10.0.0.1' (using password: YES)", 1045);
+
+        $this->assertSame(
+            "[1045] Access denied for user 'ea'@'10.0.0.1' (using password: YES)",
+            ea_db_connect_failure_detail($e, 's3cret'),
+        );
+    }
+
+    public function test_connect_failure_detail_scrubs_the_password_and_newlines(): void
+    {
+        $e = new \RuntimeException("bad s3cret\nsecond line s3cret", 0);
+
+        $this->assertSame('[0] bad *** second line ***', ea_db_connect_failure_detail($e, 's3cret'));
+    }
+
+    public function test_connect_failure_detail_with_empty_password_leaves_message(): void
+    {
+        $e = new \RuntimeException('Unable to connect to the database.');
+
+        $this->assertSame('[0] Unable to connect to the database.', ea_db_connect_failure_detail($e, ''));
+    }
 }

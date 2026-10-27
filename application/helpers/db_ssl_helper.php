@@ -80,3 +80,21 @@ function ea_db_pdo_ssl_options(array $ssl): array
         \PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => $ssl['ssl_verify'],
     ];
 }
+
+/**
+ * One log-safe line describing why a database connection failed.
+ *
+ * Driver messages ("Access denied for user ...", "SSL connection error: ...") do not carry the
+ * password, but it is scrubbed anyway, so a job log can never leak it.
+ *
+ * @param Throwable $e The connection exception.
+ * @param string $password The configured password, replaced by *** wherever it appears.
+ *
+ * @return string "[<code>] <message>" on a single line.
+ */
+function ea_db_connect_failure_detail(Throwable $e, string $password): string
+{
+    $message = $password === '' ? $e->getMessage() : str_replace($password, '***', $e->getMessage());
+
+    return '[' . $e->getCode() . '] ' . trim(preg_replace('/\s+/', ' ', $message));
+}
