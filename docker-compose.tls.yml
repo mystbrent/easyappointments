@@ -1,0 +1,38 @@
+# TLS acceptance harness (scripts/db-tls-acceptance.sh). Not for general use:
+# the script generates the certs into $TLS_DIR and picks a unique project name.
+# No published ports; everything is reached with `docker compose exec/run`.
+services:
+  mysql:
+    image: mysql:8.4
+    # Default auth plugin (caching_sha2_password) on purpose.
+    command:
+      - --require-secure-transport=ON
+      - --ssl-ca=/certs/ca.pem
+      - --ssl-cert=/certs/server.pem
+      - --ssl-key=/certs/server-key.pem
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: ea_tls
+      MYSQL_USER: ea_tls
+      MYSQL_PASSWORD: tls_pass
+    volumes:
+      - ${TLS_DIR:?set by scripts/db-tls-acceptance.sh}:/certs:ro
+
+  ea:
+    image: ea-tls:test
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    environment:
+      EA_BASE_URL: "http://localhost"
+      EA_DB_HOST: mysql
+      EA_DB_PORT: "3306"
+      EA_DB_NAME: ea_tls
+      EA_DB_USERNAME: ea_tls
+      EA_DB_PASSWORD: tls_pass
+      EA_DB_SSL: "${EA_DB_SSL:-true}"
+      EA_DB_SSL_CA_PEM: "${EA_DB_SSL_CA_PEM:-}"
+      EA_DEBUG_MODE: "true"
+      EA_GOOGLE_SYNC: "false"
+    depends_on:
+      - mysql

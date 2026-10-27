@@ -54,7 +54,9 @@ $db['default']['username'] = (($v = getenv('EA_DB_USERNAME')) !== false) ? $v : 
 $db['default']['password'] = (($v = getenv('EA_DB_PASSWORD')) !== false) ? $v : Config::DB_PASSWORD;
 $db['default']['database'] = (($v = getenv('EA_DB_NAME')) !== false) ? $v : Config::DB_NAME;
 $db['default']['port']     = (($v = getenv('EA_DB_PORT')) !== false) ? (int) $v : 3306;
-$db['default']['encrypt']  = filter_var(getenv('EA_DB_SSL') ?: 'false', FILTER_VALIDATE_BOOLEAN);
+// CI3 only applies TLS when `encrypt` is an array (see db_ssl_helper.php).
+require_once APPPATH . 'helpers/db_ssl_helper.php';
+$db['default']['encrypt']  = ea_db_ssl_config(getenv(), sys_get_temp_dir());
 $db['default']['dbdriver'] = 'mysqli';
 $db['default']['dbprefix'] = 'ea_';
 $db['default']['pconnect'] = FALSE;
