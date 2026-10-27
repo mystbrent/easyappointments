@@ -22,7 +22,7 @@ fail() { echo "  FAIL  $1"; FAIL=1; }
 TLS_DIR="$(mktemp -d)"
 export TLS_DIR
 PROJECT="ea-tls-acc-$$"
-COMPOSE="docker compose -p $PROJECT -f docker-compose.tls.yml"
+COMPOSE="docker compose --progress quiet -p $PROJECT -f docker-compose.tls.yml"
 
 cleanup() {
     $COMPOSE down -v --remove-orphans >/dev/null 2>&1
@@ -45,6 +45,18 @@ ea_run() {
 sql() { $COMPOSE exec -T mysql mysql -uroot -prootpass -N -B ea_tls -e "$1" 2>/dev/null; }
 
 migrate() { ea_run "$@" -- php index.php console migrate; }
+
+# Like migrate, but keeps stderr apart from stdout so a case can assert on it.
+# Sets MIG_OUT (stdout), MIG_ERR (stderr) and MIG_RC. EA_DEBUG_MODE stays false
+# (the compose default, same as production).
+migrate_split() {
+    local envs=() errf
+    errf=$(mktemp)
+    while [ $# -gt 0 ]; do envs+=(-e "$1"); shift; done
+    MIG_OUT=$($COMPOSE run --rm --no-deps -T --entrypoint "" "${envs[@]}" ea php index.php console migrate 2>"$errf")
+    MIG_RC=$?
+    MIG_ERR=$(cat "$errf"); rm -f "$errf"
+}
 
 # --- fixtures ----------------------------------------------------------------
 
@@ -94,15 +106,21 @@ PHP
 
 echo
 echo "== Case 1: EA_DB_SSL=false is rejected by the TLS-only server (reproduces staging) =="
-OUT=$(migrate EA_DB_SSL=false); RC=$?
-[ "$RC" -ne 0 ] && pass "migrate exits non-zero (rc=$RC): $(grep -m1 -iE 'error|prohibited|insecure' <<<"$OUT" | head -c 160)" || fail "migrate exited 0 without TLS"
+migrate_split EA_DB_SSL=false
+echo "    rc=$MIG_RC"; echo "    stdout: $(head -c 400 <<<"$MIG_OUT")"; echo "    stderr: $(head -c 400 <<<"$MIG_ERR")"
+{ [ "$MIG_RC" -ne 0 ] && [ "$MIG_RC" -ne 255 ]; } && pass "migrate exits non-zero (rc=$MIG_RC)" || fail "migrate rc=$MIG_RC (want clean non-zero)"
+grep -qx 'Database connection failed' <<<"$MIG_ERR" && pass "stderr: Database connection failed" || fail "stderr lacks 'Database connection failed'"
 
 echo
 echo "== Case 2: EA_DB_SSL=true, no PEM: system bundle cannot verify the throwaway CA =="
-OUT=$(migrate EA_DB_SSL=true EA_DB_SSL_CA_PEM=); RC=$?
-[ "$RC" -ne 0 ] && pass "migrate exits non-zero (rc=$RC)" || fail "migrate exited 0 with an unverifiable CA"
-grep -qiE 'certificate|ssl' <<<"$OUT" && pass "failure is about certificate/SSL: $(grep -m1 -iE 'certificate|ssl' <<<"$OUT" | head -c 160)" \
-    || fail "failure does not mention certificate/SSL: $(head -c 400 <<<"$OUT")"
+migrate_split EA_DB_SSL=true EA_DB_SSL_CA_PEM=
+echo "    rc=$MIG_RC"; echo "    stdout: $(head -c 400 <<<"$MIG_OUT")"; echo "    stderr: $(head -c 400 <<<"$MIG_ERR")"
+{ [ "$MIG_RC" -ne 0 ] && [ "$MIG_RC" -ne 255 ]; } && pass "migrate exits non-zero (rc=$MIG_RC)" || fail "migrate rc=$MIG_RC (want clean non-zero)"
+grep -qx 'Database connection failed' <<<"$MIG_ERR" && pass "stderr: Database connection failed" || fail "stderr lacks 'Database connection failed'"
+# Prove the failure is about verification, not something else: same server with a PEM works (case 3),
+# and the driver's warning (logged, db_debug off) names the SSL/certificate failure.
+LOGHINT=$(ea_run EA_DB_SSL=true EA_DB_SSL_CA_PEM= -- sh -c 'php index.php console migrate >/dev/null 2>&1; cat storage/logs/log-*.php 2>/dev/null' | grep -m1 -iE 'certificate|ssl')
+[ -n "$LOGHINT" ] && pass "log shows certificate/SSL cause: $(head -c 160 <<<"$LOGHINT")" || fail "no certificate/SSL cause in EA log"
 
 echo
 echo "== Case 3: EA_DB_SSL=true + EA_DB_SSL_CA_PEM: migrates over verified TLS =="

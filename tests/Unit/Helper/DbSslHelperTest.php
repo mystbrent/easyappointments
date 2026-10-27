@@ -79,6 +79,28 @@ class DbSslHelperTest extends TestCase {
         }
     }
 
+    public function test_literal_backslash_n_pem_is_normalised(): void
+    {
+        $flat = str_replace("\n", '\n', self::PEM);
+        $this->assertStringNotContainsString("\n", $flat);
+
+        $config = ea_db_ssl_config(['EA_DB_SSL' => 'true', 'EA_DB_SSL_CA_PEM' => $flat], $this->dir);
+
+        $this->assertSame(self::PEM, file_get_contents($config['ssl_ca']));
+        $this->assertSame($this->dir . '/ea-db-ca-' . hash('sha256', self::PEM) . '.pem', $config['ssl_ca']);
+    }
+
+    public function test_pem_without_end_marker_throws(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('EA_DB_SSL_CA_PEM is not a PEM certificate');
+
+        ea_db_ssl_config(
+            ['EA_DB_SSL' => 'true', 'EA_DB_SSL_CA_PEM' => "-----BEGIN CERTIFICATE-----\nMIIB\n"],
+            $this->dir,
+        );
+    }
+
     public function test_verify_false_escape_hatch(): void
     {
         $config = ea_db_ssl_config(['EA_DB_SSL' => 'true', 'EA_DB_SSL_VERIFY' => 'false'], $this->dir);

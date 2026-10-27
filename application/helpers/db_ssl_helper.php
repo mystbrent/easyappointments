@@ -32,8 +32,11 @@ function ea_db_ssl_config(array $env, string $dir): array|false
         return ['ssl_ca' => '/etc/ssl/certs/ca-certificates.crt', 'ssl_verify' => $verify];
     }
 
+    // Some env delivery paths flatten a multi-line value into literal "\n" sequences.
+    $pem = str_replace('\n', "\n", $pem);
+
     // Deliberately do not echo the value: it may be a mis-pasted secret.
-    if (!str_contains($pem, '-----BEGIN CERTIFICATE-----')) {
+    if (!str_contains($pem, '-----BEGIN CERTIFICATE-----') || !str_contains($pem, '-----END CERTIFICATE-----')) {
         throw new InvalidArgumentException('EA_DB_SSL_CA_PEM is not a PEM certificate');
     }
 
@@ -64,7 +67,7 @@ function ea_db_ssl_config(array $env, string $dir): array|false
  */
 function ea_db_pdo_ssl_options(array $ssl): array
 {
-    // PHP 8.4 deprecates PDO::MYSQL_ATTR_* in favour of Pdo\Mysql::ATTR_*.
+    // PHP 8.4 introduced Pdo\Mysql::ATTR_*; PHP 8.5 deprecates PDO::MYSQL_ATTR_*.
     if (class_exists('Pdo\Mysql')) {
         return [
             \Pdo\Mysql::ATTR_SSL_CA => $ssl['ssl_ca'],

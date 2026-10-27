@@ -32,7 +32,7 @@ services:
       EA_DB_PASSWORD: tls_pass
       EA_DB_SSL: "${EA_DB_SSL:-true}"
       EA_DB_SSL_CA_PEM: "${EA_DB_SSL_CA_PEM:-}"
-      EA_DEBUG_MODE: "true"
+      EA_DEBUG_MODE: "false"
       EA_GOOGLE_SYNC: "false"
     depends_on:
       - mysql
