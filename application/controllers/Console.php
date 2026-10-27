@@ -38,12 +38,17 @@ class Console extends EA_Controller
             // The framework's DB autoload throws when the connection fails (mysqli_sql_exception
             // from real_connect, or CI's own "Unable to connect"). Uncaught, that is a silent
             // exit(1) in production (db_debug off), which a PRE_DEPLOY job log cannot explain.
-            // Say so, cleanly, and fail.
+            // Say so, with the driver's (password-scrubbed) cause, and fail.
             if (!($e instanceof mysqli_sql_exception) && $e->getMessage() !== 'Unable to connect to the database.') {
                 throw $e;
             }
 
+            require_once APPPATH . 'helpers/db_ssl_helper.php';
+
             fwrite(STDERR, 'Database connection failed' . PHP_EOL);
+            // Same password resolution as config/database.php.
+            $password = (($v = getenv('EA_DB_PASSWORD')) !== false) ? $v : Config::DB_PASSWORD;
+            fwrite(STDERR, 'cause: ' . ea_db_connect_failure_detail($e, $password) . PHP_EOL);
 
             exit(1);
         }

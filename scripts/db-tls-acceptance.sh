@@ -110,6 +110,7 @@ migrate_split EA_DB_SSL=false
 echo "    rc=$MIG_RC"; echo "    stdout: $(head -c 400 <<<"$MIG_OUT")"; echo "    stderr: $(head -c 400 <<<"$MIG_ERR")"
 { [ "$MIG_RC" -ne 0 ] && [ "$MIG_RC" -ne 255 ]; } && pass "migrate exits non-zero (rc=$MIG_RC)" || fail "migrate rc=$MIG_RC (want clean non-zero)"
 grep -qx 'Database connection failed' <<<"$MIG_ERR" && pass "stderr: Database connection failed" || fail "stderr lacks 'Database connection failed'"
+grep -qiE '^cause: \[[0-9]+\] .*insecure transport' <<<"$MIG_ERR" && pass "stderr names the cause: $(grep -m1 '^cause:' <<<"$MIG_ERR")" || fail "stderr lacks an insecure-transport cause line"
 
 echo
 echo "== Case 2: EA_DB_SSL=true, no PEM: system bundle cannot verify the throwaway CA =="
@@ -118,9 +119,16 @@ echo "    rc=$MIG_RC"; echo "    stdout: $(head -c 400 <<<"$MIG_OUT")"; echo "  
 { [ "$MIG_RC" -ne 0 ] && [ "$MIG_RC" -ne 255 ]; } && pass "migrate exits non-zero (rc=$MIG_RC)" || fail "migrate rc=$MIG_RC (want clean non-zero)"
 grep -qx 'Database connection failed' <<<"$MIG_ERR" && pass "stderr: Database connection failed" || fail "stderr lacks 'Database connection failed'"
 # Prove the failure is about verification, not something else: same server with a PEM works (case 3),
-# and the driver's warning (logged, db_debug off) names the SSL/certificate failure.
-LOGHINT=$(ea_run EA_DB_SSL=true EA_DB_SSL_CA_PEM= -- sh -c 'php index.php console migrate >/dev/null 2>&1; cat storage/logs/log-*.php 2>/dev/null' | grep -m1 -iE 'certificate|ssl')
-[ -n "$LOGHINT" ] && pass "log shows certificate/SSL cause: $(head -c 160 <<<"$LOGHINT")" || fail "no certificate/SSL cause in EA log"
+# and the cause line names the SSL/certificate failure.
+grep -qiE '^cause: \[[0-9]+\] .*(certificate|ssl)' <<<"$MIG_ERR" && pass "stderr names the cause: $(grep -m1 '^cause:' <<<"$MIG_ERR" | head -c 160)" || fail "stderr lacks a certificate/SSL cause line"
+
+echo
+echo "== Case 2b: wrong password over verified TLS: the cause says so, and never echoes the password =="
+migrate_split EA_DB_SSL=true "EA_DB_SSL_CA_PEM=$CA_PEM" EA_DB_PASSWORD=wrong-pw-7f3a
+echo "    rc=$MIG_RC"; echo "    stderr: $(head -c 400 <<<"$MIG_ERR")"
+{ [ "$MIG_RC" -ne 0 ] && [ "$MIG_RC" -ne 255 ]; } && pass "migrate exits non-zero (rc=$MIG_RC)" || fail "migrate rc=$MIG_RC (want clean non-zero)"
+grep -qE '^cause: \[1045\] Access denied' <<<"$MIG_ERR" && pass "stderr names the cause: $(grep -m1 '^cause:' <<<"$MIG_ERR")" || fail "stderr lacks an access-denied cause line"
+grep -q 'wrong-pw-7f3a' <<<"$MIG_OUT$MIG_ERR" && fail "the password appears in the output" || pass "the password never appears in the output"
 
 echo
 echo "== Case 3: EA_DB_SSL=true + EA_DB_SSL_CA_PEM: migrates over verified TLS =="
