@@ -20,6 +20,13 @@ if ($smtp_host) {
     $config['smtp_auth'] = true;
 }
 
+// ZeptoMail over HTTPS, for hosts that block outbound SMTP (DigitalOcean App Platform).
+if (getenv('EA_MAIL_PROTOCOL') === 'zeptomail') {
+    $config['protocol'] = 'zeptomail';
+    $config['zeptomail_token'] = getenv('EA_ZEPTOMAIL_TOKEN') ?: '';
+    $config['zeptomail_endpoint'] = getenv('EA_ZEPTOMAIL_ENDPOINT') ?: 'https://api.zeptomail.com/v1.1/email';
+}
+
 $from_address = getenv('EA_MAIL_FROM_ADDRESS');
 
 if ($from_address) {
