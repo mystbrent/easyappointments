@@ -8,7 +8,9 @@
 
 <div id="header">
     <div id="company-name">
-        <img src="<?= vars('company_logo') ?: base_url('assets/img/logo.png') ?>" alt="logo" id="company-logo">
+        <?php if (vars('company_logo')): ?>
+            <img src="<?= e(vars('company_logo')) ?>" alt="logo" id="company-logo">
+        <?php endif; ?>
 
         <span>
             <?= e($company_name) ?>

@@ -4,15 +4,14 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <meta name="theme-color" content="#35A768">
+    <meta name="theme-color" content="<?= e(setting('company_color') ?: '#35A768') ?>">
     <meta name="google" content="notranslate">
 
     <?php slot('meta'); ?>
 
-    <title><?= vars('page_title') ?> | Easy!Appointments</title>
+    <title><?= vars('page_title') ?> | <?= e(setting('company_name')) ?></title>
 
-    <link rel="icon" type="image/x-icon" href="<?= asset_url('assets/img/favicon.ico') ?>">
-    <link rel="icon" sizes="192x192" href="<?= asset_url('assets/img/logo.png') ?>">
+    <link rel="icon" type="image/svg+xml" href="<?= asset_url('assets/img/dispatch-favicon.svg') ?>">
 
     <link rel="stylesheet" type="text/css"
           href="<?= asset_url('assets/css/themes/' . setting('theme', 'default') . '.css') ?>">
@@ -32,8 +31,7 @@
 
             <div class="mt-2">
                 <small>
-                    Powered by
-                    <a href="https://easyappointments.org">Easy!Appointments</a>
+                    Powered by Dispatch
                 </small>
             </div>
 

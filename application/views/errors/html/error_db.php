@@ -13,7 +13,7 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <title>Database Error | Easy!Appointments</title>
+    <title>Database Error | Dispatch</title>
     <style>
         #error-container {
             background: #ffffff;
@@ -21,12 +21,12 @@
             max-width: 600px;
             margin: auto;
             border: 1px solid #D0D0D0;
-            font: 13px/20px normal Helvetica, Arial, sans-serif;
-            color: #4F5155;
+            font: 13px/20px normal system-ui, -apple-system, "Segoe UI", sans-serif;
+            color: #18181b;
         }
 
         #error-container a {
-            color: #003399;
+            color: #18181b;
             background-color: transparent;
             font-weight: normal;
         }
@@ -62,7 +62,7 @@
     padding: 0;
     margin: 0;
     display: flex;
-    background: #f5f8fa;
+    background: #fafafa;
 ">
 <div id="error-container">
     <h1>
@@ -73,8 +73,7 @@
 
     <p>
         <small>
-            Powered by
-            <a href="https://easyappointments.org">Easy!Appointments</a>
+            Powered by Dispatch
         </small>
     </p>
 </div>

@@ -40,7 +40,7 @@ body .ui-dialog .ui-dialog-titlebar-close {
 }
 
 body .ui-draggable .ui-dialog-titlebar {
-    background: #429a82;
+    background: var(--ea-accent, #429a82);
     color: #fff;
     font-size: 1.2em;
     font-weight: lighter;
@@ -75,7 +75,7 @@ body .ui-dialog #error-technical {
 }
 
 body .ui-widget.ui-widget-content {
-    border: 1px solid #429a82;
+    border: 1px solid var(--ea-accent, #429a82);
     padding: 0;
 }
 
@@ -95,7 +95,7 @@ body .ui-datepicker {
 
 body .ui-datepicker .ui-widget-header {
     border: none;
-    background: #429a82;
+    background: var(--ea-accent, #429a82);
     border-radius: 0;
 }
 
@@ -109,7 +109,7 @@ body .ui-datepicker .ui-datepicker-title {
 }
 
 body .ui-datepicker th {
-    background: #429a82;
+    background: var(--ea-accent, #429a82);
     color: #fff;
 }
 
@@ -121,7 +121,7 @@ body .ui-datepicker td a,
 body .ui-datepicker td span {
     border: none !important;
     background: none !important;
-    color: #1a865f !important;
+    color: var(--ea-accent-strong, #1a865f) !important;
     text-align: center !important;
     width: 32px;
     height: 32px;
@@ -131,7 +131,7 @@ body .ui-datepicker td span {
 html body .ui-datepicker td a.ui-state-active {
     color: #fff !important;
     font-weight: bold !important;
-    background: #429a82 !important;
+    background: var(--ea-accent, #429a82) !important;
     border-radius: 50px;
     width: 24px;
     height: 24px;
@@ -169,8 +169,8 @@ body .ui-datepicker .ui-datepicker-next-hover {
 
 body .ui-datepicker .ui-slider-handle {
     border-radius: 0;
-    border-color: #429a82;
-    background-color: #429a82;
+    border-color: var(--ea-accent, #429a82);
+    background-color: var(--ea-accent, #429a82);
 }
 
 body .ui-priority-primary,
@@ -475,7 +475,7 @@ body .clearfix {
     .flatpickr-weekdays,
     .flatpickr-current-month .flatpickr-monthDropdown-months,
     span.flatpickr-weekday {
-        background: #429a82;
+        background: var(--ea-accent, #429a82);
         color: white;
         -webkit-appearance: none;
     }
@@ -498,8 +498,8 @@ body .clearfix {
     .flatpickr-day.startRange.prevMonthDay,
     .flatpickr-day.startRange:focus,
     .flatpickr-day.startRange:hover {
-        background: #429a82;
-        border-color: #429a82;
+        background: var(--ea-accent, #429a82);
+        border-color: var(--ea-accent, #429a82);
         color: white;
     }
 

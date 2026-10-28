@@ -50,3 +50,7 @@
         <?= $line ?>
     </p>
 </div>
+
+<p style="margin-top:12px;font:12px system-ui,-apple-system,sans-serif;color:#18181b;">
+    <small>Powered by Dispatch</small>
+</p>
