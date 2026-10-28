@@ -121,7 +121,7 @@ body .ui-datepicker td a,
 body .ui-datepicker td span {
     border: none !important;
     background: none !important;
-    color: #1a865f !important;
+    color: var(--ea-accent-strong, #1a865f) !important;
     text-align: center !important;
     width: 32px;
     height: 32px;

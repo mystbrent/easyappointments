@@ -13,12 +13,14 @@ class BrandingTest extends TestCase
 
     public function testGeneralScssHasNoBareGreen(): void
     {
+        $greens = ['#429a82', '#439a82', '#225d4d', '#0bb98d', '#1a865f'];
         foreach (['assets/css/general.scss', 'assets/css/layouts/booking_layout.scss'] as $file) {
             $css = $this->src($file);
-            $total = substr_count($css, '#429a82');
-            $wrapped = preg_match_all('/var\(--ea-accent,\s*#429a82\)/', $css);
-            $this->assertGreaterThan(0, $total, $file);
-            $this->assertSame($total, $wrapped, "$file has a bare #429a82");
+            foreach ($greens as $hex) {
+                $total = substr_count($css, $hex);
+                $wrapped = preg_match_all('/var\(--ea-accent(-strong)?,\s*' . preg_quote($hex, '/') . '\)/', $css);
+                $this->assertSame($total, $wrapped, "$file has a bare $hex");
+            }
         }
     }
 

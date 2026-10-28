@@ -11,6 +11,10 @@
 :root {
     --ea-accent: #b54016;
     --ea-accent-ink: #fff;
+    --ea-accent-strong: #8f3210;
+    --bs-body-bg: var(--ea-bg);
+    --bs-body-color: var(--ea-ink);
+    --bs-primary: var(--ea-accent);
     --ea-bg: #f6f6f4;
     --ea-ink: #191a1c;
 }
@@ -19,6 +23,7 @@
     :root {
         --ea-accent: #eb8656;
         --ea-accent-ink: #1b0e07;
+        --ea-accent-strong: #f29b6e;
         --ea-bg: #111214;
         --ea-ink: #ececea;
     }
