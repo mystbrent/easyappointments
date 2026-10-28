@@ -226,7 +226,13 @@ class Email_messages
         ?string $subject = null,
         ?string $html = null,
     ): PHPMailer {
-        $php_mailer = new PHPMailer(true);
+        if (config('protocol') === 'zeptomail') {
+            require_once APPPATH . 'libraries/Zeptomail_mailer.php';
+
+            $php_mailer = new Zeptomail_mailer(config('zeptomail_token'), config('zeptomail_endpoint'));
+        } else {
+            $php_mailer = new PHPMailer(true);
+        }
 
         $php_mailer->CharSet = 'UTF-8';
         $php_mailer->SMTPDebug = config('smtp_debug') ? SMTP::DEBUG_SERVER : null;

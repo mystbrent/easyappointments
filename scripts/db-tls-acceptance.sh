@@ -195,5 +195,51 @@ timeout 60 docker run --rm ea-tls:test sh -c 'exit 3' >/dev/null 2>&1; RC=$?
 [ "$RC" -eq 3 ] && pass "passed command's exit status propagates (3)" || fail "exit status rc=$RC (want 3)"
 
 echo
+echo "== Case 9: EA_MAIL_PROTOCOL=zeptomail posts the message over HTTPS-style API (local capture server) =="
+# A capture server inside the image stands in for api.zeptomail.com; the mailer uses EA's real
+# config/email.php and its default cURL transport, so this proves the wiring and the extension.
+read -r -d '' MAIL_PROBE <<'PHP'
+<?php
+define('BASEPATH', '/var/www/html/system/');
+define('APPPATH', '/var/www/html/application/');
+require '/var/www/html/vendor/autoload.php';
+require APPPATH . 'config/email.php';
+require APPPATH . 'libraries/Zeptomail_mailer.php';
+$m = new Zeptomail_mailer($config['zeptomail_token'], $config['zeptomail_endpoint']);
+$m->setFrom($config['from_address'], $config['from_name']);
+$m->addAddress('prospect@example.test');
+$m->Subject = 'Probe';
+$m->isHTML();
+$m->Body = '<p>Probe</p>';
+$m->AltBody = 'Probe';
+$m->addStringAttachment('BEGIN:VCALENDAR', 'invitation.ics', 'base64', 'text/calendar');
+echo 'protocol=' . $config['protocol'] . "\n";
+echo 'sent=' . var_export($m->send(), true) . "\n";
+PHP
+read -r -d '' CAPTURE <<'PHP'
+<?php
+file_put_contents('/tmp/capture.json', json_encode([
+    'auth' => $_SERVER['HTTP_AUTHORIZATION'] ?? '',
+    'type' => $_SERVER['CONTENT_TYPE'] ?? '',
+    'body' => json_decode(file_get_contents('php://input'), true),
+]));
+header('Content-Type: application/json');
+echo '{"request_id":"probe"}';
+PHP
+OUT=$(timeout 60 docker run --rm -e EA_MAIL_PROTOCOL=zeptomail -e EA_ZEPTOMAIL_TOKEN=probe-token \
+    -e EA_ZEPTOMAIL_ENDPOINT=http://127.0.0.1:8099/v1.1/email -e EA_MAIL_FROM_ADDRESS=bookings@example.test \
+    -e EA_MAIL_FROM_NAME='Leads Staging' -e "MAIL_PROBE=$MAIL_PROBE" -e "CAPTURE=$CAPTURE" ea-tls:test sh -c '
+        printf "%s" "$CAPTURE" > /tmp/capture.php && printf "%s" "$MAIL_PROBE" > /tmp/probe.php
+        php -S 127.0.0.1:8099 /tmp/capture.php >/dev/null 2>&1 & sleep 1
+        php /tmp/probe.php && echo "capture=$(cat /tmp/capture.json)"' 2>&1); RC=$?
+echo "    $(head -c 600 <<<"$OUT")"
+[ "$RC" -eq 0 ] && grep -qx 'protocol=zeptomail' <<<"$OUT" && grep -qx 'sent=true' <<<"$OUT" \
+    && pass "config/email.php selects zeptomail and send() returns true" || fail "probe rc=$RC"
+CAP=$(sed -n 's/^capture=//p' <<<"$OUT")
+[ "$(jq -r .auth <<<"$CAP" 2>/dev/null)" = "Zoho-enczapikey probe-token" ] && pass "Authorization: Zoho-enczapikey <token>" || fail "authorization header"
+[ "$(jq -r '.body.from.address + "|" + .body.to[0].email_address.address + "|" + .body.htmlbody + "|" + .body.attachments[0].mime_type' <<<"$CAP" 2>/dev/null)" \
+    = "bookings@example.test|prospect@example.test|<p>Probe</p>|text/calendar" ] && pass "payload: from, to, htmlbody, ics attachment" || fail "payload shape: $(head -c 300 <<<"$CAP")"
+
+echo
 [ "$FAIL" -eq 0 ] && echo "ALL CRITERIA PASSED" || echo "ACCEPTANCE FAILED"
 exit "$FAIL"
