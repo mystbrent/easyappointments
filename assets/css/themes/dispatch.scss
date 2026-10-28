@@ -1,0 +1,33 @@
+// Dispatch theme. Hex values derived from the kanban tokens.css:
+//   light accent oklch(0.53 0.16 38) = #b54016, dark accent oklch(0.72 0.14 45) = #eb8656
+//   light bg #f6f6f4 / ink #191a1c; dark bg #111214 / ink #ececea
+@import 'default';
+
+@font-face { font-family: 'Geist'; font-weight: 400; font-display: swap; src: url('../../fonts/geist/geist-400.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-weight: 500; font-display: swap; src: url('../../fonts/geist/geist-500.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-weight: 600; font-display: swap; src: url('../../fonts/geist/geist-600.woff2') format('woff2'); }
+@font-face { font-family: 'Geist Mono'; font-weight: 400; font-display: swap; src: url('../../fonts/geist/geist-mono-400.woff2') format('woff2'); }
+
+:root {
+    --ea-accent: #b54016;
+    --ea-accent-ink: #fff;
+    --ea-bg: #f6f6f4;
+    --ea-ink: #191a1c;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ea-accent: #eb8656;
+        --ea-accent-ink: #1b0e07;
+        --ea-bg: #111214;
+        --ea-ink: #ececea;
+    }
+}
+
+body {
+    font-family: 'Geist', system-ui, sans-serif;
+    background: var(--ea-bg);
+    color: var(--ea-ink);
+}
+
+code, pre, kbd { font-family: 'Geist Mono', monospace; }
