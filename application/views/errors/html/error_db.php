@@ -13,7 +13,7 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <title>Database Error | <?= e(setting('company_name')) ?></title>
+    <title>Database Error | Dispatch</title>
     <style>
         #error-container {
             background: #ffffff;

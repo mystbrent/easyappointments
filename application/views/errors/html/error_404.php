@@ -13,7 +13,7 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <title>404 Page Not Found | <?= e(setting('company_name')) ?></title>
+    <title>404 Page Not Found | <?php try { $n = (function_exists('setting') && isset(get_instance()->db)) ? setting('company_name') : ''; } catch (Throwable $e) { $n = ''; } echo htmlspecialchars($n ?: 'Dispatch'); ?></title>
     <style>
         #error-container {
             background: #ffffff;

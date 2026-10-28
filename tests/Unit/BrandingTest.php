@@ -118,4 +118,9 @@ class BrandingTest extends TestCase
         $this->assertStringContainsString('@copyright', $php);
         $this->assertStringContainsString('GPL-3.0', $php);
     }
+
+    public function testErrorDbNeverCallsSetting(): void
+    {
+        $this->assertStringNotContainsString('setting(', $this->src(self::V . 'errors/html/error_db.php'));
+    }
 }

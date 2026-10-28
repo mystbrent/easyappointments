@@ -12,7 +12,7 @@
     <title><?= vars('page_title') ?? lang('account') ?> | <?= e(setting('company_name')) ?></title>
 
     <link rel="icon" type="image/svg+xml" href="<?= asset_url('assets/img/dispatch-favicon.svg') ?>">
-    
+
     <link rel="stylesheet" type="text/css"
           href="<?= asset_url('assets/css/themes/' . setting('theme', 'default') . '.css') ?>">
     <link rel="stylesheet" type="text/css" href="<?= asset_url('assets/css/general.css') ?>">
