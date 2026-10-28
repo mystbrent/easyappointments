@@ -42,4 +42,80 @@ class BrandingTest extends TestCase
             $this->assertMatchesRegularExpression('/theme-color" content="<\?= e\(setting\(\'company_color\'\) \?: \'#35A768\'\)/', $php, $layout);
         }
     }
+
+    private const V = 'application/views/';
+
+    private function prospectFiles(): array
+    {
+        $v = self::V;
+        return [
+            $v . 'components/booking_footer.php', $v . 'components/booking_header.php',
+            $v . 'layouts/booking_layout.php', $v . 'layouts/message_layout.php', $v . 'layouts/account_layout.php',
+            $v . 'errors/html/error_404.php', $v . 'errors/html/error_general.php', $v . 'errors/html/error_db.php',
+            $v . 'errors/html/error_exception.php', $v . 'errors/html/error_php.php',
+            $v . 'emails/appointment_saved_email.php', $v . 'emails/appointment_deleted_email.php',
+            $v . 'emails/account_recovery_email.php', $v . 'pages/booking_confirmation.php',
+        ];
+    }
+
+    private function stripComments(string $php): string
+    {
+        $php = preg_replace('#/\*.*?\*/#s', '', $php);
+        $php = preg_replace('#<!--.*?-->#s', '', $php);
+        return preg_replace('#^\s*//.*$#m', '', $php);
+    }
+
+    public function testNoEaCreditInProspectViews(): void
+    {
+        foreach ($this->prospectFiles() as $file) {
+            $code = $this->stripComments($this->src($file));
+            $this->assertDoesNotMatchRegularExpression('/Easy!?Appointments/i', $code, $file);
+            $this->assertStringNotContainsString('easyappointments.org', $code, $file);
+        }
+    }
+
+    public function testFooterSaysPoweredByDispatch(): void
+    {
+        $v = self::V;
+        $files = [
+            $v . 'components/booking_footer.php', $v . 'layouts/message_layout.php', $v . 'layouts/account_layout.php',
+            $v . 'errors/html/error_404.php', $v . 'errors/html/error_general.php', $v . 'errors/html/error_db.php',
+            $v . 'errors/html/error_exception.php', $v . 'errors/html/error_php.php',
+            $v . 'emails/appointment_saved_email.php', $v . 'emails/appointment_deleted_email.php',
+            $v . 'emails/account_recovery_email.php',
+        ];
+        foreach ($files as $file) {
+            $this->assertStringContainsString('Powered by Dispatch', $this->src($file), $file);
+        }
+    }
+
+    public function testHeaderNeverFallsBackToEaLogo(): void
+    {
+        $this->assertStringNotContainsString('assets/img/logo.png', $this->src(self::V . 'components/booking_header.php'));
+    }
+
+    public function testEmailFallbackColourIsNeutral(): void
+    {
+        foreach (['appointment_saved', 'appointment_deleted', 'account_recovery'] as $e) {
+            $php = $this->src(self::V . "emails/{$e}_email.php");
+            $this->assertStringContainsString("?? '#18181b'", $php, $e);
+            $this->assertStringNotContainsString('#429a82', $php, $e);
+        }
+    }
+
+    public function testConfirmationEmailLineIsConditional(): void
+    {
+        $php = $this->src(self::V . 'pages/booking_confirmation.php');
+        $this->assertMatchesRegularExpression(
+            "/setting\('customer_notifications'\).*?appointment_details_was_sent_to_you.*?endif/s",
+            $php,
+        );
+    }
+
+    public function testCopyrightHeadersKept(): void
+    {
+        $php = $this->src('application/controllers/Booking.php');
+        $this->assertStringContainsString('@copyright', $php);
+        $this->assertStringContainsString('GPL-3.0', $php);
+    }
 }

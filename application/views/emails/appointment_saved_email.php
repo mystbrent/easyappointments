@@ -17,14 +17,14 @@
 <html lang="en">
 <head>
     <title>
-        <?= lang('appointment_details_title') ?> | Easy!Appointments
+        <?= lang('appointment_details_title') ?> | <?= e(setting('company_name')) ?>
     </title>
 </head>
 <body style="font: 13px arial, helvetica, tahoma;">
 
 <div class="email-container" style="width: 650px; border: 1px solid #eee; margin: 30px auto;">
     <div id="header"
-         style="background-color: <?= $settings['company_color'] ?? '#429a82' ?>; height: 45px; padding: 10px 15px;">
+         style="background-color: <?= $settings['company_color'] ?? '#18181b' ?>; height: 45px; padding: 10px 15px;">
         <strong id="logo" style="color: white; font-size: 20px; margin-top: 10px; display: inline-block">
             <?= e($settings['company_name']) ?>
         </strong>
@@ -179,10 +179,7 @@
 
     <div id="footer" style="padding: 10px; text-align: center; margin-top: 10px;
                 border-top: 1px solid #EEE; background: #FAFAFA;">
-        Powered by
-        <a href="https://easyappointments.org" style="text-decoration: none;">
-            Easy!Appointments
-        </a>
+        Powered by Dispatch
         |
         <a href="<?= e($settings['company_link']) ?>" style="text-decoration: none;">
             <?= e($settings['company_name']) ?>

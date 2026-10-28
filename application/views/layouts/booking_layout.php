@@ -7,19 +7,18 @@
     <meta name="theme-color" content="<?= e(setting('company_color') ?: '#35A768') ?>">
     <meta name="google" content="notranslate">
 
-    <meta property="og:title" content="<?= lang('page_title') . ' ' . vars('company_name') ?> | Easy!Appointments"/>
+    <meta property="og:title" content="<?= lang('page_title') . ' ' . vars('company_name') ?> | <?= e(setting('company_name')) ?>"/>
     <meta property="og:description" content="Book Your Appointment With A Few Clicks"/>
     <meta property="og:url" content="<?= base_url() ?>">
-    <meta property="og:image" content="<?= base_url('assets/img/social-card.png') ?>"/>
+    <meta property="og:image" content="<?= base_url('assets/img/dispatch-social.png') ?>"/>
     <meta property="og:type" content="website">
 
     <?php slot('meta'); ?>
 
-    <title><?= lang('page_title') . ' ' . vars('company_name') ?> | Easy!Appointments</title>
+    <title><?= lang('page_title') . ' ' . vars('company_name') ?> | <?= e(setting('company_name')) ?></title>
 
-    <link rel="icon" type="image/x-icon" href="<?= asset_url('assets/img/favicon.ico') ?>">
-    <link rel="icon" sizes="192x192" href="<?= asset_url('assets/img/logo.png') ?>">
-
+    <link rel="icon" type="image/svg+xml" href="<?= asset_url('assets/img/dispatch-favicon.svg') ?>">
+    
     <link rel="stylesheet" type="text/css" href="<?= asset_url('assets/vendor/cookieconsent/cookieconsent.min.css') ?>">
     <link rel="stylesheet" type="text/css" href="<?= asset_url('assets/vendor/flatpickr/flatpickr.min.css') ?>">
     <?php if (setting('theme') !== 'dispatch'): ?>

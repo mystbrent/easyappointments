@@ -3,15 +3,21 @@
 <?php section('content'); ?>
 
 <div>
-    <img id="success-icon" class="mt-0 mb-5" src="<?= base_url('assets/img/success.png') ?>" alt="success"/>
+    <svg id="success-icon" class="mt-0 mb-5" width="80" height="80" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="success">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M7.5 12.5l3 3 6-6.5"/>
+    </svg>
 </div>
 
 <div class="mb-5">
     <h4 class="mb-5"><?= lang('appointment_registered') ?></h4>
 
-    <p>
-        <?= lang('appointment_details_was_sent_to_you') ?>
-    </p>
+    <?php if (setting('customer_notifications')): ?>
+        <p>
+            <?= lang('appointment_details_was_sent_to_you') ?>
+        </p>
+    <?php endif; ?>
 
     <p class="mb-5 text-muted">
         <small>
